@@ -1,16 +1,17 @@
-import useAuth from '../../../hooks/useAuth'
-import { Helmet } from 'react-helmet-async'
-import useRole from '../../../hooks/useRole'
-
-import { AiOutlineLoading } from 'react-icons/ai'
-import { LoaderCircleIcon } from 'lucide-react'
+import React, { useState } from 'react';
+import { Helmet } from 'react-helmet-async';
+import { LoaderCircleIcon } from 'lucide-react';
+import useRole from '@/hooks/useRole.js';
+import useAuth from '@/hooks/useAuth.jsx';
+import UpdateProfileModal from '@/components/Modal/UpdateUserProfile.jsx';
 
 const Profile = () => {
-    const { user, loading } = useAuth() || {}
-    const [role, isLoading] = useRole()
+    const { user, loading } = useAuth() || {};
+    const [role, isLoading] = useRole();
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
-    console.log(user)
-    if (isLoading || loading) return <LoaderCircleIcon />
+    if (isLoading || loading) return <LoaderCircleIcon />;
+
     return (
         <div className='flex justify-center items-center h-screen'>
             <Helmet>
@@ -30,7 +31,6 @@ const Profile = () => {
                             className='mx-auto object-cover rounded-full h-24 w-24  border-2 border-white '
                         />
                     </a>
-
                     <p className='p-2 uppercase px-4 text-xs text-white bg-pink-500 rounded-full'>
                         {role}
                     </p>
@@ -49,9 +49,11 @@ const Profile = () => {
                                 Email
                                 <span className='font-bold text-black '>{user?.email}</span>
                             </p>
-
                             <div>
-                                <button className='bg-[#F43F5E] px-10 py-1 rounded-lg text-white cursor-pointer hover:bg-[#af4053] block mb-1'>
+                                <button
+                                    onClick={() => setIsModalOpen(true)}
+                                    className='bg-[#F43F5E] px-10 py-1 rounded-lg text-white cursor-pointer hover:bg-[#af4053] block mb-1'
+                                >
                                     Update Profile
                                 </button>
                                 <button className='bg-[#F43F5E] px-7 py-1 rounded-lg text-white cursor-pointer hover:bg-[#af4053]'>
@@ -62,8 +64,12 @@ const Profile = () => {
                     </div>
                 </div>
             </div>
+            <UpdateProfileModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+            />
         </div>
-    )
-}
+    );
+};
 
-export default Profile
+export default Profile;
