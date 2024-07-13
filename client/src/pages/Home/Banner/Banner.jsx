@@ -9,11 +9,11 @@ const Banner = () => {
                 <Fade direction="down" cascade>
                     <h1 className="text-5xl font-extrabold text-white mb-4 shadow-md">Send Your Parcels with Ease and Speed</h1>
                     <p className="text-lg text-gray-300 mb-8">Reliable, fast, and affordable delivery services at your fingertips.</p>
-                    <Input
+                    {/* <Input
                         type="text"
                         placeholder="Track your parcel..."
                         className="w-full md:w-1/2 mx-auto"
-                    />
+                    /> */}
                 </Fade>
             </div>
         </div>
