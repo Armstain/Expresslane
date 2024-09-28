@@ -1,16 +1,12 @@
-
-import React from 'react';
 import Chart from 'react-apexcharts';
 import useAxiosSecure from '@/hooks/useAxiosSecure';
 import { useQuery } from "@tanstack/react-query";
-import { TbFidgetSpinner } from "react-icons/tb";
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import LoadingSpinner from '@/components/Shared/LoadingSpinner.jsx';
 
 const Statistics = () => {
     const axiosSecure = useAxiosSecure();
-
-    // Fetch booking data by date
+   
     const {
         data: bookingsByDate = [],
         isLoading: bookingsLoading,
@@ -26,8 +22,7 @@ const Statistics = () => {
             y: booking.count,
         })),
     });
-
-    // Bar Chart State
+   
     const barChartSeries = [{ name: 'Booked Parcels', data: bookingsByDate }];
     const barChartOptions = {
         chart: { id: 'bookings-bar-chart' },
@@ -36,9 +31,8 @@ const Statistics = () => {
         title: { text: 'Parcel Bookings by Date', align: 'center' },
     };
 
-    // Fetch parcels data
     const {
-        data: parcelsData = [],
+        data: parcelsData = { bookings: [], deliveries: [] },
         isLoading: parcelsLoading,
         error: parcelsError
     } = useQuery({
@@ -50,15 +44,17 @@ const Statistics = () => {
         select: data => {
             const bookingsByDate = {};
             const deliveriesByDate = {};
-
             data.forEach(parcel => {
-                const date = format(new Date(parcel.deliveryDate), 'yyyy-MM-dd');
-                bookingsByDate[date] = (bookingsByDate[date] || 0) + 1;
-                if (parcel.status === 'delivered') {
-                    deliveriesByDate[date] = (deliveriesByDate[date] || 0) + 1;
+                try {
+                    const date = format(parseISO(parcel.deliveryDate), 'yyyy-MM-dd');
+                    bookingsByDate[date] = (bookingsByDate[date] || 0) + 1;
+                    if (parcel.status === 'delivered') {
+                        deliveriesByDate[date] = (deliveriesByDate[date] || 0) + 1;
+                    }
+                } catch (error) {
+                    console.error("Error parsing date:", parcel.deliveryDate, error);
                 }
             });
-
             const formattedBookings = Object.entries(bookingsByDate).map(([date, count]) => ({
                 x: new Date(date).getTime(),
                 y: count,
@@ -67,7 +63,6 @@ const Statistics = () => {
                 x: new Date(date).getTime(),
                 y: count,
             }));
-
             return {
                 bookings: formattedBookings,
                 deliveries: formattedDeliveries,
@@ -76,8 +71,8 @@ const Statistics = () => {
     });
 
     const lineChartSeries = [
-        { name: 'Booked', data: parcelsData.bookings || [] },
-        { name: 'Delivered', data: parcelsData.deliveries || [] }
+        { name: 'Booked', data: parcelsData.bookings },
+        { name: 'Delivered', data: parcelsData.deliveries }
     ];
     const lineChartOptions = {
         chart: { id: 'parcels-line-chart' },
@@ -87,25 +82,24 @@ const Statistics = () => {
     };
 
     if (bookingsLoading || parcelsLoading) {
-        return <LoadingSpinner></LoadingSpinner>;
+        return <LoadingSpinner />;
     }
 
     if (bookingsError || parcelsError) {
+        console.error("Bookings error:", bookingsError);
+        console.error("Parcels error:", parcelsError);
         return <p>Error loading data</p>;
     }
-
+   
     return (
         <div className="container mx-auto mt-12">
             <h1 className="text-3xl font-bold mb-8">Statistics</h1>
-
             <Chart
                 options={barChartOptions}
                 series={barChartSeries}
                 type="bar"
                 height={350}
             />
-
-            {/* Optional Line Chart */}
             <Chart
                 options={lineChartOptions}
                 series={lineChartSeries}

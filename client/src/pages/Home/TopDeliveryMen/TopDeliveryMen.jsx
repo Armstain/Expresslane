@@ -55,8 +55,7 @@ const TopDeliveryMen = () => {
             averageRating
         };
     });
-    const topDeliveryMen = deliveryMenWithStats
-        .sort((a, b) => {
+    const topDeliveryMen = deliveryMenWithStats.sort((a, b) => {
 
             if (b.numDeliveries !== a.numDeliveries) {
                 return b.numDeliveries - a.numDeliveries;

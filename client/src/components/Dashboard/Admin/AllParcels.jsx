@@ -62,6 +62,7 @@ const AllParcels = () => {
         },
     });
 
+    // eslint-disable-next-line no-unused-vars
     const { data: allDeliveryMen = [], isLoading: isDeliveryMenLoading } = useQuery({
         queryKey: ['DeliveryMen'],
         queryFn: async () => {
@@ -129,7 +130,7 @@ const AllParcels = () => {
                             <TableCell className="font-medium">{parcel.name}</TableCell>
                             <TableCell className="font-medium">{parcel.phoneNumber}</TableCell>
                             <TableCell className="font-medium">{parcel.parcelType}</TableCell>
-                            <TableCell>{format(new Date(parcel.deliveryDate), 'dd/MM/yyyy')}</TableCell>
+                            {/* <TableCell>{format(new Date(parcel.deliveryDate), 'dd/MM/yyyy')}</TableCell> */}
                             {/* <TableCell>
                                 {calculateApproximateDeliveryDate(parcel.parcelType, parcel.deliveryDate)}
                             </TableCell> */}
