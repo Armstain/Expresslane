@@ -20,5 +20,4 @@ Welcome to ExpressLane, your reliable parcel delivery service. This project leve
 
 - Visit `https://expreane-c2384.web.app/` to view the application.
 - Register or log in to start managing your parcels.
-- Use the admin dashboard to manage users and orders.
 
