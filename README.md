@@ -8,7 +8,6 @@ Welcome to ExpressLane, your reliable parcel delivery service. This project leve
 - **Order Management**: Create, update, and delete delivery orders.
 - **Responsive Design**: Mobile-first approach with Tailwind CSS.
 - **Admin Dashboard**: Manage users and orders with ease.
-- **Notifications**: Email notifications for order updates.
 
 ## Tech Stack
 
