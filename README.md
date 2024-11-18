@@ -14,7 +14,7 @@ Welcome to ExpressLane, your reliable parcel delivery service. This project leve
 - **Frontend**: React, Tailwind CSS, Shadcn
 - **Backend**: Node.js, Express.js
 - **Database**: MongoDB
-- **Authentication**: JWT (JSON Web Tokens)
+- **Authentication**: Firebase, JWT (JSON Web Tokens)
 
 
 - Visit `https://expreane-c2384.web.app/` to view the application.
