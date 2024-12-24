@@ -78,15 +78,24 @@ const AllDeliveryMen = () => {
   });
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-            Delivery Personnel
-          </h2>
-          <p className="text-gray-600 dark:text-gray-300 mt-2">
-            Total Delivery Men: {deliveryMenWithStats.length}
-          </p>
+    <div className="container mx-auto px-4 sm:px-8 py-8">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
+        {/* Gradient Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
+          <h2 className="text-2xl font-bold text-white">Delivery Personnel</h2>
+          <div className="flex items-center gap-4 mt-2">
+            <p className="text-blue-100">
+              Total Delivery Men: {deliveryMenWithStats.length}
+            </p>
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-100"></span>
+            <p className="text-blue-100">
+              Active:{" "}
+              {
+                deliveryMenWithStats.filter((dm) => dm.status === "active")
+                  .length
+              }
+            </p>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -104,57 +113,59 @@ const AllDeliveryMen = () => {
               {deliveryMenWithStats.map((deliveryMan) => (
                 <TableRow
                   key={deliveryMan._id}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="hover:bg-blue-50 dark:hover:bg-gray-700 transition-all duration-200"
                 >
                   <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white overflow-hidden">
                         {deliveryMan?.photoURL ? (
                           <img
                             src={deliveryMan.photoURL}
                             alt={deliveryMan.displayName}
-                            className="h-10 w-10 rounded-full object-cover"
+                            className="h-full w-full object-cover"
                           />
                         ) : (
-                          <span className="text-xl font-bold text-gray-600">
+                          <span className="text-xl font-bold">
                             {deliveryMan?.displayName?.charAt(0)}
                           </span>
                         )}
                       </div>
                       <div>
-                        <p className="font-semibold">
+                        <p className="font-semibold text-gray-800 dark:text-gray-200">
                           {deliveryMan.displayName}
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
                           {deliveryMan.email}
                         </p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <p>{deliveryMan.phoneNumber || "N/A"}</p>
+                    <p className="text-gray-600 dark:text-gray-300">
+                      {deliveryMan.phoneNumber || "N/A"}
+                    </p>
                   </TableCell>
                   <TableCell>
-                    <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-800">
+                    <span className="px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 font-medium">
                       {deliveryMan.numDeliveries}
                     </span>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <span
-                        className={`px-3 py-1 rounded-full ${
+                        className={`px-3 py-1.5 rounded-full font-medium ${
                           deliveryMan.averageRating !== "N/A"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
+                            ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
+                            : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300"
                         }`}
                       >
-                        {deliveryMan.averageRating}{" "}
+                        {deliveryMan.averageRating}
                         {deliveryMan.averageRating !== "N/A" && "⭐"}
                       </span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="px-3 py-1 rounded-full bg-green-100 text-green-800">
+                    <span className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 font-medium">
                       Active
                     </span>
                   </TableCell>

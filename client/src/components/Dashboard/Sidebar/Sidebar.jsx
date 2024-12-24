@@ -28,13 +28,13 @@ const Sidebar = () => {
   return (
     <>
       {/* Small Screen Navbar */}
-      <div className="bg-white shadow-md text-gray-800 flex justify-between md:hidden dark:bg-gray-800 sticky top-0 z-30">
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white flex justify-between md:hidden sticky top-0 z-30">
         <div className="p-2">
           <Link to="/" className="block">
             <img
               src="https://i.ibb.co/Ksmghct/Picture1.png"
               alt="logo"
-              className="h-12 w-auto"
+              className="h-12 w-auto filter brightness-0 invert"
             />
           </Link>
         </div>
@@ -49,7 +49,7 @@ const Sidebar = () => {
 
       {/* Sidebar */}
       <div
-        className={`z-40 md:fixed flex flex-col justify-between overflow-x-hidden bg-white dark:bg-gray-800 w-72 space-y-6 px-2 py-4 absolute inset-y-0 left-0 transform ${
+        className={`z-40 md:fixed flex flex-col justify-between overflow-x-hidden bg-gradient-to-b from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 w-72 space-y-6 px-2 py-4 absolute inset-y-0 left-0 transform ${
           isActive && "-translate-x-full"
         } md:translate-x-0 transition duration-200 ease-in-out shadow-lg`}
       >
@@ -69,8 +69,8 @@ const Sidebar = () => {
           <div className="flex flex-col flex-1 mt-6">
             <nav className="space-y-2">
               {role === "user" && (
-                <div className="space-y-2">
-                  <UserMenuItem className="transition-colors duration-200"></UserMenuItem>
+                <div className="space-y-2 transition-all duration-200 hover:translate-x-2">
+                  <UserMenuItem />
                 </div>
               )}
 
@@ -104,7 +104,7 @@ const Sidebar = () => {
           {/* Logout Button */}
           <button
             onClick={logOut}
-            className="flex w-full items-center px-4 py-2 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors duration-200 dark:text-gray-300 dark:hover:bg-red-900/20 dark:hover:text-red-500"
+            className="flex w-full items-center px-4 py-2 text-gray-600 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 rounded-lg transition-all duration-300 transform hover:scale-105"
           >
             <GrLogout className="w-5 h-5" />
             <span className="mx-4 font-medium">Logout</span>

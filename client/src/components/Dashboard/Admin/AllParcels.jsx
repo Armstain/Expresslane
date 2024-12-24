@@ -117,15 +117,18 @@ const AllParcels = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-            Parcel Management
-          </h2>
-          <p className="text-gray-600 dark:text-gray-300 mt-2">
-            Total Parcels: {parcels.length}
-          </p>
+    <div className="container mx-auto px-4 sm:px-8 py-8">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
+        {/* Gradient Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
+          <h2 className="text-2xl font-bold text-white">Parcel Management</h2>
+          <div className="flex items-center gap-4 mt-2">
+            <p className="text-blue-100">Total Parcels: {parcels.length}</p>
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-100"></span>
+            <p className="text-blue-100">
+              Pending: {parcels.filter((p) => p.status === "pending").length}
+            </p>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -146,30 +149,38 @@ const AllParcels = () => {
               {parcels.map((parcel) => (
                 <TableRow
                   key={parcel._id}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="hover:bg-blue-50 dark:hover:bg-gray-700 transition-all duration-200"
                 >
-                  <TableCell className="font-medium">{parcel.name}</TableCell>
-                  <TableCell>{parcel.phoneNumber}</TableCell>
+                  <TableCell className="font-medium text-gray-800 dark:text-gray-200">
+                    {parcel.name}
+                  </TableCell>
+                  <TableCell className="text-gray-600 dark:text-gray-300">
+                    {parcel.phoneNumber}
+                  </TableCell>
                   <TableCell>
-                    <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-800">
+                    <span className="px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 font-medium">
                       {parcel.parcelType}
                     </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-gray-600 dark:text-gray-300">
                     {format(new Date(parcel.createdDate), "MMM dd, yyyy")}
                   </TableCell>
-                  <TableCell>${parcel.price}</TableCell>
                   <TableCell>
+                    <span className="font-medium text-gray-800 dark:text-gray-200">
+                      ${parcel.price}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-gray-600 dark:text-gray-300">
                     {parcel.deliveryManId || "Not Assigned"}
                   </TableCell>
                   <TableCell>
                     <span
-                      className={`px-5 py-1 rounded-full ${
+                      className={`px-3 py-1.5 rounded-full font-medium ${
                         parcel.status === "delivered"
-                          ? "bg-green-100 text-green-800"
+                          ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
                           : parcel.status === "on the way"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-gray-100 text-gray-800"
+                          ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100"
+                          : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300"
                       }`}
                     >
                       {parcel.status}
@@ -179,7 +190,7 @@ const AllParcels = () => {
                     <Button
                       disabled={parcel.status === "delivered"}
                       onClick={() => handleManageClick(parcel)}
-                      className="bg-blue-500 hover:bg-blue-600"
+                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white transition-all duration-300 transform hover:scale-105"
                     >
                       Manage
                     </Button>
@@ -190,7 +201,7 @@ const AllParcels = () => {
                           setIsDeleteOpen(true);
                         }}
                         variant="destructive"
-                        className="bg-red-500 hover:bg-red-600 my-2"
+                        className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white transition-all duration-300 transform hover:scale-105"
                       >
                         Delete
                       </Button>

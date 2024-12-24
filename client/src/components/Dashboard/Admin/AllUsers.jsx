@@ -66,14 +66,10 @@ const AllUsers = () => {
         <title>Manage Users</title>
       </Helmet>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-            User Management
-          </h2>
-          <p className="text-gray-600 dark:text-gray-300 mt-2">
-            Total Users: {users.length}
-          </p>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
+          <h2 className="text-2xl font-bold text-white">User Management</h2>
+          <p className="text-blue-100 mt-2">Total Users: {users.length}</p>
         </div>
 
         <div className="overflow-x-auto">
@@ -91,19 +87,19 @@ const AllUsers = () => {
               {users.map((user) => (
                 <TableRow
                   key={user?._id}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors duration-200"
                 >
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white overflow-hidden">
                         {user?.photoURL ? (
                           <img
                             src={user.photoURL}
                             alt={user.displayName}
-                            className="h-10 w-10 rounded-full object-cover"
+                            className="h-full w-full object-cover"
                           />
                         ) : (
-                          <span className="text-xl font-bold text-gray-600">
+                          <span className="text-xl font-bold">
                             {user?.displayName?.charAt(0)}
                           </span>
                         )}
