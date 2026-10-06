@@ -3,6 +3,7 @@ import { Package, Star, Trophy } from "lucide-react";
 import { axiosPublic } from "@/api/axiosPublic.js";
 import UserAvatar from "@/components/Shared/UserAvatar.jsx";
 import { Skeleton } from "@/components/ui/skeleton";
+import Reveal from "@/components/Shared/Reveal.jsx";
 
 const fetchJson = (url) => async () => (await axiosPublic.get(url)).data;
 
@@ -54,9 +55,11 @@ const TopDeliveryMen = () => {
           {isLoading
             ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-64 rounded-xl" />)
             : topDeliveryMen.map((man, i) => (
-                <article
+                <Reveal
+                  as="article"
                   key={man._id}
-                  className="relative rounded-xl border bg-card p-6 text-center shadow-soft transition-shadow hover:shadow-lift"
+                  delay={i * 100}
+                  className="relative rounded-2xl border bg-card p-6 text-center shadow-soft hover:shadow-lift"
                 >
                   {i === 0 && (
                     <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">
@@ -85,7 +88,7 @@ const TopDeliveryMen = () => {
                       <p className="text-xs text-muted-foreground">Rating</p>
                     </div>
                   </div>
-                </article>
+                </Reveal>
               ))}
         </div>
       </div>

@@ -15,6 +15,7 @@ const Contact = lazy(() => import('@/pages/Contact/Contact.jsx'))
 const DashboardHome = lazy(() => import('@/pages/Dashboard/DashboardHome.jsx'))
 const Statistics = lazy(() => import('@/pages/Dashboard/Common/Statistics.jsx'))
 const Profile = lazy(() => import('@/pages/Dashboard/Common/Profile.jsx'))
+const Overview = lazy(() => import('@/pages/Dashboard/User/Overview.jsx'))
 const BookParcel = lazy(() => import('@/pages/Dashboard/User/BookParcel.jsx'))
 const MyParcels = lazy(() => import('@/pages/Dashboard/User/MyParcels.jsx'))
 const DeliveryList = lazy(() => import('@/pages/Dashboard/DeliveryMen/DeliveryList.jsx'))
@@ -50,6 +51,7 @@ export const router = createBrowserRouter([
             { index: true, element: <DashboardHome /> },
             { path: 'profile', element: <Profile /> },
             // customer
+            { path: 'overview', element: withRole(['user'], <Overview />) },
             { path: 'book-parcel', element: withRole(['user'], <BookParcel />) },
             { path: 'my-parcels', element: withRole(['user'], <MyParcels />) },
             // delivery partner

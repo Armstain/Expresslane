@@ -4,13 +4,14 @@ import toast from "react-hot-toast";
 import Confetti from "react-confetti";
 import { loadStripe } from "@stripe/stripe-js";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { CreditCard, Package, PackagePlus, Star, X } from "lucide-react";
+import { ChevronRight, CreditCard, Package, PackagePlus, Star, X } from "lucide-react";
 import useAuth from "@/hooks/useAuth.jsx";
 import useAxiosSecure from "@/hooks/useAxiosSecure.jsx";
 import { calculateApproximateDeliveryDate, formatDate } from "@/api/utils/dateUtils.js";
 import { formatPrice } from "@/lib/parcel.js";
 import { cn } from "@/lib/utils";
 import ReviewModal from "@/components/Modal/ReviewModal.jsx";
+import ParcelDetailsSheet from "@/components/Parcel/ParcelDetailsSheet.jsx";
 import PaymentModal from "@/components/Modal/PaymentModal.jsx";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog.jsx";
 import EmptyState from "@/components/Shared/EmptyState.jsx";
@@ -41,6 +42,7 @@ const MyParcels = () => {
   const [reviewParcel, setReviewParcel] = useState(null);
   const [payParcel, setPayParcel] = useState(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [detailParcel, setDetailParcel] = useState(null);
 
   const { data: parcels = [], isLoading, refetch } = useQuery({
     queryKey: ["my-parcel", user?.email],
@@ -156,13 +158,17 @@ const MyParcels = () => {
           <ul className="divide-y md:hidden">
             {visible.map((parcel) => (
               <li key={parcel._id} className="space-y-3 p-4">
-                <div className="flex items-start justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDetailParcel(parcel)}
+                  className="flex w-full items-start justify-between gap-3 text-left"
+                >
                   <div>
                     <p className="font-medium">{parcel.parcelType} · {formatPrice(parcel.price)}</p>
                     <p className="text-sm text-muted-foreground">To {parcel.recipientName || "—"}</p>
                   </div>
                   <StatusBadge status={parcel.status} />
-                </div>
+                </button>
                 <dl className="grid grid-cols-3 gap-2 text-xs">
                   <div><dt className="text-muted-foreground">Booked</dt><dd className="font-medium">{formatDate(parcel.createdDate)}</dd></div>
                   <div><dt className="text-muted-foreground">Pickup</dt><dd className="font-medium">{formatDate(parcel.deliveryDate)}</dd></div>
@@ -188,7 +194,7 @@ const MyParcels = () => {
             </TableHeader>
             <TableBody>
               {visible.map((parcel) => (
-                <TableRow key={parcel._id}>
+                <TableRow key={parcel._id} className="cursor-pointer" onClick={() => setDetailParcel(parcel)}>
                   <TableCell>
                     <p className="font-medium">{parcel.parcelType}</p>
                     <p className="text-xs text-muted-foreground">
@@ -207,7 +213,12 @@ const MyParcels = () => {
                     <StatusBadge status={parcel.status} />
                   </TableCell>
                   <TableCell>
-                    <div className="flex justify-end gap-2">{renderActions(parcel)}</div>
+                    <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      {renderActions(parcel)}
+                      <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => setDetailParcel(parcel)} aria-label="View details">
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -226,6 +237,13 @@ const MyParcels = () => {
         cancelLabel="Keep booking"
         destructive
         onConfirm={() => cancelParcel(cancelId)}
+      />
+      <ParcelDetailsSheet
+        parcel={detailParcel}
+        open={!!detailParcel}
+        onOpenChange={(open) => !open && setDetailParcel(null)}
+        actions={detailParcel && (detailParcel.status === "pending" || detailParcel.status === "delivered") ? renderActions(detailParcel) : null}
+        onAction={() => setDetailParcel(null)}
       />
       <ReviewModal isOpen={!!reviewParcel} onClose={() => setReviewParcel(null)} parcel={reviewParcel} />
       <PaymentModal

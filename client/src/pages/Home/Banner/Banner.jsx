@@ -22,7 +22,11 @@ const TrackingPreview = () => (
           <p className="mt-1 font-mono text-sm font-semibold">EXL-2048-7731</p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-info/10 px-2.5 py-1 text-xs font-semibold text-info">
-          <Truck className="h-3.5 w-3.5" /> On the way
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-info opacity-60 motion-reduce:hidden" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-info" />
+          </span>
+          On the way
         </span>
       </div>
 
@@ -67,7 +71,7 @@ const TrackingPreview = () => (
       </ol>
 
       <div className="mt-5 h-2 overflow-hidden rounded-full bg-secondary">
-        <div className="h-full w-2/3 rounded-full bg-primary" />
+        <div className="h-full w-2/3 origin-left animate-[grow_1.4s_ease-out_both] rounded-full bg-primary motion-reduce:animate-none" />
       </div>
     </div>
 
@@ -87,6 +91,7 @@ const Banner = () => {
   return (
     <section className="relative overflow-hidden">
       <div className="absolute inset-0 -z-10 bg-grid [mask-image:radial-gradient(ellipse_at_top,black_30%,transparent_70%)]" aria-hidden="true" />
+      <div className="absolute left-1/2 top-0 -z-10 h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
       <div className="container grid items-center gap-14 py-16 sm:py-20 lg:grid-cols-2 lg:gap-10 lg:py-28">
         <div className="animate-fade-up">
           <span className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">

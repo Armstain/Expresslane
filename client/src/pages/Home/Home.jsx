@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button";
 import Banner from "./Banner/Banner.jsx";
 import Features from "./Features/Features.jsx";
 import TopDeliveryMen from "./TopDeliveryMen/TopDeliveryMen.jsx";
+import Pricing from "./Pricing/Pricing.jsx";
+import Testimonials from "./Testimonials/Testimonials.jsx";
+import Faq from "./Faq/Faq.jsx";
+import Reveal from "@/components/Shared/Reveal.jsx";
 
 const Home = () => {
   return (
@@ -15,8 +19,12 @@ const Home = () => {
       <Banner />
       <Features />
       <TopDeliveryMen />
+      <Pricing />
+      <Testimonials />
+      <Faq />
       <section className="container py-16 sm:py-24">
-        <div className="flex flex-col items-center gap-6 rounded-2xl border bg-card px-6 py-12 text-center shadow-soft sm:px-12">
+        <Reveal className="relative flex flex-col items-center gap-6 overflow-hidden rounded-3xl border bg-card px-6 py-14 text-center shadow-soft sm:px-12">
+          <div className="absolute inset-0 -z-10 bg-grid [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_70%)]" aria-hidden="true" />
           <h2 className="max-w-2xl text-balance text-3xl font-bold sm:text-4xl">
             Ready to send your first parcel?
           </h2>
@@ -33,7 +41,7 @@ const Home = () => {
               <Link to="/contact">Talk to us</Link>
             </Button>
           </div>
-        </div>
+        </Reveal>
       </section>
     </>
   );

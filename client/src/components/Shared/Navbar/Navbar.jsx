@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
   { to: "/", label: "Home", end: true },
+  { to: "/#pricing", label: "Pricing", hash: true },
   { to: "/about", label: "About" },
   { to: "/contact", label: "Contact" },
   { to: "/dashboard", label: "Dashboard" },
@@ -64,7 +65,7 @@ const Navbar = () => {
                     className={({ isActive }) =>
                       cn(
                         "rounded-lg px-3 py-2.5 text-base font-medium transition-colors",
-                        isActive ? "bg-accent text-accent-foreground" : "hover:bg-secondary"
+                        isActive && !link.hash ? "bg-accent text-accent-foreground" : "hover:bg-secondary"
                       )
                     }
                   >
@@ -88,11 +89,17 @@ const Navbar = () => {
         </div>
 
         <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
-          {NAV_LINKS.map((link) => (
-            <NavLink key={link.to} to={link.to} end={link.end} className={linkClass}>
-              {link.label}
-            </NavLink>
-          ))}
+          {NAV_LINKS.map((link) =>
+            link.hash ? (
+              <Link key={link.to} to={link.to} className={linkClass({ isActive: false })}>
+                {link.label}
+              </Link>
+            ) : (
+              <NavLink key={link.to} to={link.to} end={link.end} className={linkClass}>
+                {link.label}
+              </NavLink>
+            )
+          )}
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-2">

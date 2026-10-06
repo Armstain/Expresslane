@@ -1,5 +1,6 @@
 import {
     BarChart3,
+    LayoutDashboard,
     Bike,
     MessageSquareText,
     Package,
@@ -11,6 +12,7 @@ import {
 // Sidebar links and default landing page for each role
 export const ROLE_NAV = {
     user: [
+        { label: 'Overview', address: '/dashboard/overview', icon: LayoutDashboard },
         { label: 'Book a parcel', address: '/dashboard/book-parcel', icon: PackagePlus },
         { label: 'My parcels', address: '/dashboard/my-parcels', icon: Package },
     ],
