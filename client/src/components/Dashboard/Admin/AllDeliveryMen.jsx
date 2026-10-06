@@ -1,181 +1,109 @@
-import React from "react";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableHead,
-} from "@/components/ui/table";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
+import { Bike, Phone, Star } from "lucide-react";
 import useAxiosSecure from "@/hooks/useAxiosSecure.jsx";
-import { TbFidgetSpinner } from "react-icons/tb";
+import EmptyState from "@/components/Shared/EmptyState.jsx";
+import LoadingSpinner from "@/components/Shared/LoadingSpinner.jsx";
+import PageHeader from "@/components/Shared/PageHeader.jsx";
+import UserAvatar from "@/components/Shared/UserAvatar.jsx";
+import { Card } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const AllDeliveryMen = () => {
   const axiosSecure = useAxiosSecure();
+  const get = (url) => async () => (await axiosSecure.get(url)).data;
 
-  // Fetch all delivery men
-  const { data: allDeliveryMen = [], isLoading: isLoadingDeliveryMen } =
-    useQuery({
-      queryKey: ["delivery-men"],
-      queryFn: async () => {
-        const res = await axiosSecure.get("/users?");
-        return res.data.filter((user) => user.role === "DeliveryMen");
-      },
-    });
-
-  // Fetch all deliveries
-  const { data: allDeliveries = [], isLoading: isLoadingDeliveries } = useQuery(
-    {
-      queryKey: ["parcels"],
-      queryFn: async () => {
-        const res = await axiosSecure.get("/parcels");
-        return res.data;
-      },
-    }
-  );
-
-  // Fetch all reviews
-  const { data: allReviews = [], isLoading: isLoadingReviews } = useQuery({
-    queryKey: ["reviews"],
-    queryFn: async () => {
-      const res = await axiosSecure.get("/reviews");
-      return res.data;
-    },
+  const [usersQ, parcelsQ, reviewsQ] = useQueries({
+    queries: [
+      { queryKey: ["users"], queryFn: get("/users") },
+      { queryKey: ["parcels"], queryFn: get("/parcels") },
+      { queryKey: ["reviews"], queryFn: get("/reviews") },
+    ],
   });
 
-  if (isLoadingDeliveryMen || isLoadingDeliveries) {
-    return (
-      <div className="flex justify-center items-center h-[60vh]">
-        <TbFidgetSpinner className="w-8 h-8 animate-spin text-blue-500" />
-      </div>
-    );
-  }
+  if (usersQ.isLoading || parcelsQ.isLoading) return <LoadingSpinner />;
 
-  // Calculate number of deliveries and average rating for each delivery man
-  const deliveryMenWithStats = allDeliveryMen.map((deliveryMan) => {
-    const deliveries = allDeliveries.filter(
-      (delivery) => delivery.deliveryManId === deliveryMan._id
-    );
-    const numDeliveries = deliveries.length;
-
-    const reviews = allReviews.filter(
-      (review) => review.deliveryManId === deliveryMan._id
-    );
-    const averageRating =
-      reviews.length > 0
-        ? (
-            reviews.reduce((acc, review) => acc + review.rating, 0) /
-            reviews.length
-          ).toFixed(2)
-        : "N/A";
-
-    return {
-      ...deliveryMan,
-      numDeliveries,
-      averageRating,
-    };
-  });
+  const parcels = parcelsQ.data || [];
+  const reviews = reviewsQ.data || [];
+  const deliveryMen = (usersQ.data || [])
+    .filter((u) => u.role === "DeliveryMen")
+    .map((man) => {
+      const assigned = parcels.filter((p) => p.deliveryManId === man._id);
+      const own = reviews.filter((r) => r.deliveryManId === man._id);
+      return {
+        ...man,
+        assigned: assigned.length,
+        delivered: assigned.filter((p) => p.status === "delivered").length,
+        reviewCount: own.length,
+        averageRating: own.length
+          ? own.reduce((sum, r) => sum + Number(r.rating || 0), 0) / own.length
+          : null,
+      };
+    })
+    .sort((a, b) => b.delivered - a.delivered);
 
   return (
-    <div className="container mx-auto px-4 sm:px-8 py-8">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
-        {/* Gradient Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
-          <h2 className="text-2xl font-bold text-white">Delivery Personnel</h2>
-          <div className="flex items-center gap-4 mt-2">
-            <p className="text-blue-100">
-              Total Delivery Men: {deliveryMenWithStats.length}
-            </p>
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-100"></span>
-            <p className="text-blue-100">
-              Active:{" "}
-              {
-                deliveryMenWithStats.filter((dm) => dm.status === "active")
-                  .length
-              }
-            </p>
-          </div>
-        </div>
+    <>
+      <PageHeader title="Delivery men" description={`${deliveryMen.length} delivery partners on the team.`} />
 
-        <div className="overflow-x-auto">
+      <Card className="overflow-hidden">
+        {deliveryMen.length === 0 ? (
+          <EmptyState
+            icon={Bike}
+            title="No delivery men yet"
+            description="Promote a user to delivery partner from the Users page."
+          />
+        ) : (
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50 dark:bg-gray-700">
-                <TableHead className="font-semibold">Name</TableHead>
-                <TableHead className="font-semibold">Contact</TableHead>
-                <TableHead className="font-semibold">Deliveries</TableHead>
-                <TableHead className="font-semibold">Rating</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Name</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead className="text-right">Assigned</TableHead>
+                <TableHead className="text-right">Delivered</TableHead>
+                <TableHead>Rating</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {deliveryMenWithStats.map((deliveryMan) => (
-                <TableRow
-                  key={deliveryMan._id}
-                  className="hover:bg-blue-50 dark:hover:bg-gray-700 transition-all duration-200"
-                >
+              {deliveryMen.map((man) => (
+                <TableRow key={man._id}>
                   <TableCell>
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white overflow-hidden">
-                        {deliveryMan?.photoURL ? (
-                          <img
-                            src={deliveryMan.photoURL}
-                            alt={deliveryMan.displayName}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-xl font-bold">
-                            {deliveryMan?.displayName?.charAt(0)}
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-800 dark:text-gray-200">
-                          {deliveryMan.displayName}
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {deliveryMan.email}
-                        </p>
+                    <div className="flex items-center gap-3">
+                      <UserAvatar src={man.photoURL} name={man.displayName} email={man.email} className="h-9 w-9" />
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{man.displayName || "—"}</p>
+                        <p className="truncate text-xs text-muted-foreground">{man.email}</p>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <p className="text-gray-600 dark:text-gray-300">
-                      {deliveryMan.phoneNumber || "N/A"}
-                    </p>
+                  <TableCell className="text-muted-foreground">
+                    {man.phoneNumber ? (
+                      <a href={`tel:${man.phoneNumber}`} className="inline-flex items-center gap-1.5 hover:text-foreground">
+                        <Phone className="h-3.5 w-3.5" /> {man.phoneNumber}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
+                  <TableCell className="text-right tabular-nums">{man.assigned}</TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">{man.delivered}</TableCell>
                   <TableCell>
-                    <span className="px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 font-medium">
-                      {deliveryMan.numDeliveries}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <span
-                        className={`px-3 py-1.5 rounded-full font-medium ${
-                          deliveryMan.averageRating !== "N/A"
-                            ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
-                            : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300"
-                        }`}
-                      >
-                        {deliveryMan.averageRating}
-                        {deliveryMan.averageRating !== "N/A" && "⭐"}
+                    {man.averageRating ? (
+                      <span className="inline-flex items-center gap-1.5 tabular-nums">
+                        <Star className="h-4 w-4 fill-warning text-warning" />
+                        <span className="font-medium">{man.averageRating.toFixed(1)}</span>
+                        <span className="text-xs text-muted-foreground">({man.reviewCount})</span>
                       </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 font-medium">
-                      Active
-                    </span>
+                    ) : (
+                      <span className="text-muted-foreground">No reviews</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </div>
-      </div>
-    </div>
+        )}
+      </Card>
+    </>
   );
 };
 

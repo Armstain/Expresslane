@@ -1,63 +1,85 @@
-import React from 'react';
-import {
-    Dialog,
-    DialogHeader,
-    DialogTitle,
-    DialogContent,
-} from "@/components/ui/dialog";
+import PropTypes from 'prop-types';
+import { Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const AllParcelModal = ({ isOpen, onClose, parcelToUpdate, allDeliveryMen, setSelectedDeliveryMan, setApproximateDeliveryDate, handleAssignParcel, selectedDeliveryMan, approximateDeliveryDate }) => {
-    return (
-        <Dialog open={isOpen} onOpenChange={onClose} className="w-[450px]">
-
-            <DialogContent className="p-4">
-                <div className="mb-4">
-                    <Label htmlFor="delivery-man" className="mb-1 block font-medium text-gray-700">Delivery Man</Label>
-                    <Select
-                        id="delivery-man"
-                        value={selectedDeliveryMan}
-                        onValueChange={setSelectedDeliveryMan}
-                        className="w-full"
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a delivery man" />
+const AllParcelModal = ({
+    isOpen,
+    onClose,
+    parcel,
+    deliveryMen,
+    deliveryManId,
+    setDeliveryManId,
+    approximateDeliveryDate,
+    setApproximateDeliveryDate,
+    onAssign,
+    saving,
+}) => (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Assign a rider</DialogTitle>
+                <DialogDescription>
+                    {parcel?.parcelType} parcel from {parcel?.name || parcel?.email} to {parcel?.recipientName}.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+                <div className="space-y-2">
+                    <Label htmlFor="delivery-man">Delivery man</Label>
+                    <Select value={deliveryManId || undefined} onValueChange={setDeliveryManId}>
+                        <SelectTrigger id="delivery-man">
+                            <SelectValue placeholder={deliveryMen.length ? "Select a delivery man" : "No delivery men yet"} />
                         </SelectTrigger>
                         <SelectContent>
-                            {allDeliveryMen.map((man) => (
+                            {deliveryMen.map((man) => (
                                 <SelectItem key={man._id} value={man._id}>
-                                    {man.displayName || man.email || 'Unknown Name'}
+                                    {man.displayName || man.email}
                                 </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
                 </div>
-                <div>
-                    <Label htmlFor="delivery-date" className="mb-1 block font-medium text-gray-700">Approximate Delivery Date</Label>
+                <div className="space-y-2">
+                    <Label htmlFor="delivery-date">Approximate delivery date</Label>
                     <Input
                         id="delivery-date"
                         type="date"
-                        value={approximateDeliveryDate}
+                        value={approximateDeliveryDate || ''}
                         onChange={(e) => setApproximateDeliveryDate(e.target.value)}
-                        className="w-full"
                     />
                 </div>
-                <div className="mt-4 flex justify-end">
-                    <Button onClick={() => handleAssignParcel(parcelToUpdate)} className="bg-blue-500 hover:bg-blue-600 text-white">Assign</Button>
-                    <Button onClick={onClose} className="ml-2">Cancel</Button>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={onClose}>Cancel</Button>
+                <Button onClick={onAssign} disabled={!deliveryManId || !approximateDeliveryDate || saving}>
+                    {saving && <Loader2 className="h-4 w-4 animate-spin" />} Assign
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+);
+
+AllParcelModal.propTypes = {
+    isOpen: PropTypes.bool,
+    onClose: PropTypes.func.isRequired,
+    parcel: PropTypes.object,
+    deliveryMen: PropTypes.array.isRequired,
+    deliveryManId: PropTypes.string,
+    setDeliveryManId: PropTypes.func.isRequired,
+    approximateDeliveryDate: PropTypes.string,
+    setApproximateDeliveryDate: PropTypes.func.isRequired,
+    onAssign: PropTypes.func.isRequired,
+    saving: PropTypes.bool,
 };
 
 export default AllParcelModal;

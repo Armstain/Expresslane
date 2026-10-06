@@ -1,40 +1,47 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import PropTypes from "prop-types";
+import { createContext, useContext, useEffect, useState } from "react";
+
+const STORAGE_KEY = "expresslane-theme";
 
 const ThemeContext = createContext({
-    theme: "light", // Default theme
-    setTheme: () => { }, // Placeholder function
+  theme: "light",
+  setTheme: () => {},
 });
 
+const getInitialTheme = (defaultTheme) => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === "light" || saved === "dark") return saved;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  } catch {
+    return defaultTheme;
+  }
+};
+
 export function ThemeProvider({ children, defaultTheme = "light" }) {
-    const getInitialTheme = () => {
-        // Check localStorage for a saved theme
-        const savedTheme = localStorage.getItem("expresslane-theme");
-        return savedTheme ? savedTheme : defaultTheme;
-    };
+  const [theme, setTheme] = useState(() => getInitialTheme(defaultTheme));
 
-    const [theme, setTheme] = useState(getInitialTheme);
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark");
+    root.classList.add(theme);
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch {
+      // storage unavailable (private mode) — theme still applies for this session
+    }
+  }, [theme]);
 
-    useEffect(() => {
-        const root = window.document.documentElement;
-
-        root.classList.remove("light", "dark"); // Remove existing classes
-        root.classList.add(theme);
-
-        // Store theme in localStorage (optional)
-        localStorage.setItem("expresslane-theme", theme);
-    }, [theme]);
-
-    const handleSetTheme = (newTheme) => {
-        setTheme(newTheme);
-    };
-
-    return (
-        <ThemeContext.Provider value={{ theme, setTheme: handleSetTheme }}>
-            {children}
-        </ThemeContext.Provider>
-    );
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
-export const useTheme = () => {
-    return useContext(ThemeContext);
+ThemeProvider.propTypes = {
+  children: PropTypes.node,
+  defaultTheme: PropTypes.oneOf(["light", "dark"]),
 };
+
+export const useTheme = () => useContext(ThemeContext);

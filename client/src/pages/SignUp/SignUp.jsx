@@ -1,194 +1,147 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FcGoogle } from "react-icons/fc";
-import useAuth from "../../hooks/useAuth";
 import toast from "react-hot-toast";
-import { TbFidgetSpinner } from "react-icons/tb";
+import { Camera, Eye, EyeOff, Loader2 } from "lucide-react";
+import useAuth from "../../hooks/useAuth";
 import { imageUpload } from "../../api/utils";
+import AuthLayout, { GoogleIcon, OrDivider } from "@/components/Shared/AuthLayout.jsx";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const SignUp = () => {
   const navigate = useNavigate();
-  const {
-    createUser,
-    signInWithGoogle,
-    updateUserProfile,
-    loading,
-    setLoading,
-    saveUser,
-  } = useAuth();
+  const { createUser, signInWithGoogle, updateUserProfile, loading, setLoading, saveUser } = useAuth();
+  const [preview, setPreview] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview]);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    setPreview(file ? URL.createObjectURL(file) : null);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const form = e.target;
-    const name = form.name.value;
+    const name = form.name.value.trim();
     const email = form.email.value;
     const phone = form.phone.value;
     const password = form.password.value;
     const image = form.image.files[0];
 
-    try {
-      setLoading(true);
-      // 1. Upload image and get image url
-      const image_url = await imageUpload(image);
-      console.log(image_url);
-      //2. User Registration
-      const result = await createUser(email, password);
-      console.log(result);
-      // 3. Save username and photo in firebase
-      await updateUserProfile(name, image_url);
+    if (password.length < 6) return toast.error("Password must be at least 6 characters.");
 
-      // 4. Save user data to backend
+    setSubmitting(true);
+    try {
+      const image_url = image ? await imageUpload(image) : null;
+      await createUser(email, password);
+      await updateUserProfile(name, image_url);
       await saveUser({
         displayName: name,
         email,
         phoneNumber: phone,
         photoURL: image_url,
-        role: "user",
       });
-
-      navigate("/");
-      toast.success("Signup Successful");
+      navigate("/dashboard");
+      toast.success("Account created — welcome to ExpressLane!");
     } catch (err) {
-      console.log(err);
       toast.error(err.message);
     } finally {
+      setSubmitting(false);
       setLoading(false);
     }
   };
 
-  // handle google signin
   const handleGoogleSignIn = async () => {
     try {
       await signInWithGoogle();
-      navigate("/");
-      toast.success("Signup Successful");
+      navigate("/dashboard");
+      toast.success("Welcome to ExpressLane!");
     } catch (err) {
-      console.log(err);
       toast.error(err.message);
+      setLoading(false);
     }
   };
 
-  return (
-    <div className="flex justify-center items-center min-h-screen">
-      <div className="flex flex-col max-w-md p-6 rounded-md sm:p-10 bg-gray-100 text-gray-900">
-        <div className="mb-8 text-center">
-          <h1 className="my-3 text-4xl font-bold">Sign Up</h1>
-          <p className="text-sm text-gray-400">Welcome to ExpressLane</p>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block mb-2 text-sm">
-                Name
-              </label>
-              <input
-                type="text"
-                name="name"
-                id="name"
-                placeholder="Enter Your Name Here"
-                className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-rose-500 bg-gray-200 text-gray-900"
-                data-temp-mail-org="0"
-              />
-            </div>
-            <div>
-              <label htmlFor="image" className="block mb-2 text-sm">
-                Select Image:
-              </label>
-              <input
-                required
-                type="file"
-                id="image"
-                name="image"
-                accept="image/*"
-              />
-            </div>
-            <div>
-              <label htmlFor="email" className="block mb-2 text-sm">
-                Email address
-              </label>
-              <input
-                type="email"
-                name="email"
-                id="email"
-                required
-                placeholder="Enter Your Email Here"
-                className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-rose-500 bg-gray-200 text-gray-900"
-                data-temp-mail-org="0"
-              />
-            </div>
-            <div>
-              <label htmlFor="phone" className="block mb-2 text-sm">
-                Phone Number
-              </label>
-              <input
-                type="number"
-                name="phone"
-                id="phone"
-                required
-                placeholder="Enter Your Phone Number"
-                className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-rose-500 bg-gray-200 text-gray-900"
-                data-temp-mail-org="0"
-              />
-            </div>
-            <div>
-              <div className="flex justify-between">
-                <label htmlFor="password" className="text-sm mb-2">
-                  Password
-                </label>
-              </div>
-              <input
-                type="password"
-                name="password"
-                autoComplete="new-password"
-                id="password"
-                required
-                placeholder="*******"
-                className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-rose-500 bg-gray-200 text-gray-900"
-              />
-            </div>
-          </div>
+  const busy = submitting || loading;
 
-          <div>
+  return (
+    <AuthLayout title="Create your account" description="Start sending parcels in minutes." pageTitle="Sign up">
+      <Button type="button" variant="outline" size="lg" className="w-full" disabled={busy} onClick={handleGoogleSignIn}>
+        <GoogleIcon /> Sign up with Google
+      </Button>
+
+      <OrDivider label="or with email" />
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex items-center gap-4">
+          <label
+            htmlFor="image"
+            className="relative flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed bg-secondary text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+          >
+            {preview ? (
+              <img src={preview} alt="Selected profile" className="h-full w-full object-cover" />
+            ) : (
+              <Camera className="h-5 w-5" />
+            )}
+            <input id="image" name="image" type="file" accept="image/*" className="sr-only" onChange={handleImageChange} />
+          </label>
+          <div className="text-sm">
+            <p className="font-medium">Profile photo</p>
+            <p className="text-muted-foreground">Optional · JPG or PNG</p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="name">Full name</Label>
+          <Input id="name" name="name" autoComplete="name" placeholder="Jane Doe" required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="phone">Phone number</Label>
+          <Input id="phone" name="phone" type="tel" autoComplete="tel" placeholder="01XXXXXXXXX" required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <div className="relative">
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              placeholder="At least 6 characters"
+              minLength={6}
+              className="pr-10"
+              required
+            />
             <button
-              disabled={loading}
-              type="submit"
-              className="bg-rose-500 w-full rounded-md py-3 text-white"
+              type="button"
+              onClick={() => setShowPassword((s) => !s)}
+              className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+              aria-label={showPassword ? "Hide password" : "Show password"}
             >
-              {loading ? (
-                <TbFidgetSpinner className="animate-spin m-auto" />
-              ) : (
-                "Continue"
-              )}
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-        </form>
-        <div className="flex items-center pt-4 space-x-1">
-          <div className="flex-1 h-px sm:w-16 dark:bg-gray-700"></div>
-          <p className="px-3 text-sm dark:text-gray-400">
-            Signup with social accounts
-          </p>
-          <div className="flex-1 h-px sm:w-16 dark:bg-gray-700"></div>
         </div>
-        <button
-          disabled={loading}
-          onClick={handleGoogleSignIn}
-          className="disabled:cursor-not-allowed flex justify-center items-center space-x-2 border m-3 p-2 border-gray-300 border-rounded cursor-pointer"
-        >
-          <FcGoogle size={32} />
+        <Button type="submit" size="lg" className="w-full" disabled={busy}>
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create account"}
+        </Button>
+      </form>
 
-          <p>Continue with Google</p>
-        </button>
-        <p className="px-6 text-sm text-center text-gray-400">
-          Already have an account?{" "}
-          <Link
-            to="/login"
-            className="hover:underline hover:text-rose-500 text-gray-600"
-          >
-            Login
-          </Link>
-          .
-        </p>
-      </div>
-    </div>
+      <p className="mt-8 text-center text-sm text-muted-foreground">
+        Already have an account?{" "}
+        <Link to="/login" className="font-semibold text-primary hover:underline">
+          Log in
+        </Link>
+      </p>
+    </AuthLayout>
   );
 };
 

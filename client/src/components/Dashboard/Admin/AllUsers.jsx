@@ -1,144 +1,113 @@
-import { Helmet } from "react-helmet-async";
-import useAxiosSecure from "../../../hooks/useAxiosSecure";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { LoaderCircle } from "lucide-react";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableHead,
-} from "@/components/ui/table";
-import UpdateUserModal from "@/components/Modal/UpdateUserModal.jsx";
-import useAuth from "@/hooks/useAuth.jsx";
+import { useState } from "react";
 import toast from "react-hot-toast";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Search, Users } from "lucide-react";
+import useAxiosSecure from "../../../hooks/useAxiosSecure";
+import UpdateUserModal from "@/components/Modal/UpdateUserModal.jsx";
+import { ROLE_LABEL } from "@/components/Dashboard/Sidebar/navigation.js";
+import EmptyState from "@/components/Shared/EmptyState.jsx";
+import LoadingSpinner from "@/components/Shared/LoadingSpinner.jsx";
+import PageHeader from "@/components/Shared/PageHeader.jsx";
+import UserAvatar from "@/components/Shared/UserAvatar.jsx";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+const ROLE_BADGE = { admin: "default", DeliveryMen: "info", user: "secondary" };
 
 const AllUsers = () => {
   const axiosSecure = useAxiosSecure();
-  const { user, loading } = useAuth();
+  const [search, setSearch] = useState("");
+
+  const { data: users = [], isLoading, refetch } = useQuery({
+    queryKey: ["users"],
+    queryFn: async () => (await axiosSecure.get("/users")).data,
+  });
+
+  const { data: parcels = [] } = useQuery({
+    queryKey: ["parcels"],
+    queryFn: async () => (await axiosSecure.get("/parcels")).data,
+  });
 
   const { mutateAsync } = useMutation({
-    mutationFn: async (updatedUserData) => {
-      const { data } = await axiosSecure.patch(
-        `/users/update/${updatedUserData._id}`,
-        { role: updatedUserData.role }
-      );
+    mutationFn: async ({ _id, role }) => {
+      const { data } = await axiosSecure.patch(`/users/update/${_id}`, { role });
       return data;
     },
     onSuccess: () => {
       refetch();
-      toast.success("Role updated successfully");
+      toast.success("Role updated");
     },
+    onError: () => toast.error("Failed to update role"),
   });
 
-  const handleUpdateRole = async (userId, role) => {
-    try {
-      await mutateAsync({ _id: userId, role });
-    } catch (error) {
-      console.error("Error updating role:", error);
-      toast.error("Failed to update role");
-    }
-  };
+  if (isLoading) return <LoadingSpinner />;
 
-  const {
-    data: users = [],
-    isLoading,
-    refetch,
-  } = useQuery({
-    queryKey: ["users"],
-    queryFn: async () => {
-      const { data } = await axiosSecure(`/users`);
-      return data;
-    },
-  });
-
-  if (isLoading)
-    return (
-      <div className="flex justify-center items-center h-[60vh]">
-        <LoaderCircle className="animate-spin h-8 w-8 text-blue-500" />
-      </div>
-    );
+  const bookedBy = parcels.reduce((acc, p) => ({ ...acc, [p.email]: (acc[p.email] || 0) + 1 }), {});
+  const term = search.trim().toLowerCase();
+  const visible = term
+    ? users.filter((u) => `${u.displayName} ${u.email}`.toLowerCase().includes(term))
+    : users;
 
   return (
-    <div className="container mx-auto px-4 sm:px-8 py-8">
-      <Helmet>
-        <title>Manage Users</title>
-      </Helmet>
+    <>
+      <PageHeader title="Users" description={`${users.length} registered accounts.`} />
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
-          <h2 className="text-2xl font-bold text-white">User Management</h2>
-          <p className="text-blue-100 mt-2">Total Users: {users.length}</p>
+      <Card className="overflow-hidden">
+        <div className="border-b p-3">
+          <div className="relative max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or email"
+              className="pl-9"
+              aria-label="Search users"
+            />
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {visible.length === 0 ? (
+          <EmptyState icon={Users} title="No users found" description="Try a different search." />
+        ) : (
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50 dark:bg-gray-700">
-                <TableHead className="font-semibold">Name</TableHead>
-                <TableHead className="font-semibold">Phone Number</TableHead>
-                <TableHead className="font-semibold">Parcel Booked</TableHead>
-                <TableHead className="font-semibold">Role</TableHead>
-                <TableHead className="font-semibold">Actions</TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>User</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Parcels booked</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
-                <TableRow
-                  key={user?._id}
-                  className="hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors duration-200"
-                >
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white overflow-hidden">
-                        {user?.photoURL ? (
-                          <img
-                            src={user.photoURL}
-                            alt={user.displayName}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-xl font-bold">
-                            {user?.displayName?.charAt(0)}
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-semibold">{user?.displayName}</p>
-                        <p className="text-sm text-gray-500">{user?.email}</p>
+              {visible.map((u) => (
+                <TableRow key={u._id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <UserAvatar src={u.photoURL} name={u.displayName} email={u.email} className="h-9 w-9" />
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{u.displayName || "—"}</p>
+                        <p className="truncate text-xs text-muted-foreground">{u.email}</p>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>{user.phoneNumber || "-"}</TableCell>
+                  <TableCell className="text-muted-foreground">{u.phoneNumber || "—"}</TableCell>
+                  <TableCell className="tabular-nums">{bookedBy[u.email] || 0}</TableCell>
                   <TableCell>
-                    <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-800">
-                      {user.parcelBooked || 0}
-                    </span>
+                    <Badge variant={ROLE_BADGE[u.role] || "secondary"}>{ROLE_LABEL[u.role] || u.role || "—"}</Badge>
                   </TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-3 py-1 rounded-full ${
-                        user.role === "admin"
-                          ? "bg-purple-100 text-purple-800"
-                          : user.role === "DeliveryMen"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {user.role}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <UpdateUserModal user={user} onUpdate={handleUpdateRole} />
+                  <TableCell className="text-right">
+                    <UpdateUserModal user={u} onUpdate={(_id, role) => mutateAsync({ _id, role })} />
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </div>
-      </div>
-    </div>
+        )}
+      </Card>
+    </>
   );
 };
 

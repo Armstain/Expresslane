@@ -1,23 +1,29 @@
+import { lazy } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
-import Main from '../layouts/Main'
-import Home from '../pages/Home/Home'
-import ErrorPage from '../pages/ErrorPage'
-import Login from '@/pages/Login/Login.jsx'
-import SignUp from '@/pages/SignUp/SignUp.jsx'
-import DashboardLayout from '@/layouts/DashboardLayout.jsx'
-import BookParcel from '@/pages/Dashboard/User/BookParcel.jsx'
-import Statistics from '@/pages/Dashboard/Common/Statistics.jsx'
-import MyParcels from '@/pages/Dashboard/User/MyParcels.jsx'
-import Profile from '@/pages/Dashboard/Common/Profile.jsx'
-import AllUsers from '@/components/Dashboard/Admin/AllUsers.jsx'
-import DeliveryList from '@/pages/Dashboard/DeliveryMen/DeliveryList.jsx'
-import Reviews from '@/pages/Dashboard/DeliveryMen/Reviews.jsx'
-import AllParcels from '@/components/Dashboard/Admin/AllParcels.jsx'
-import AllDeliveryMen from '@/components/Dashboard/Admin/AllDeliveryMen.jsx'
-import About from '@/pages/About/About.jsx'
-import Contact from '@/pages/Contact/Contact.jsx'
+import Main from '../layouts/Main.jsx'
+import Home from '../pages/Home/Home.jsx'
+import ErrorPage from '../pages/ErrorPage.jsx'
+import Login from '../pages/Login/Login.jsx'
+import SignUp from '../pages/SignUp/SignUp.jsx'
+import DashboardLayout from '../layouts/DashboardLayout.jsx'
 import PrivateRoute from './PrivateRoute.jsx'
+import RoleRoute from './RoleRoute.jsx'
 
+// Secondary pages load on demand to keep the landing page bundle small
+const About = lazy(() => import('@/pages/About/About.jsx'))
+const Contact = lazy(() => import('@/pages/Contact/Contact.jsx'))
+const DashboardHome = lazy(() => import('@/pages/Dashboard/DashboardHome.jsx'))
+const Statistics = lazy(() => import('@/pages/Dashboard/Common/Statistics.jsx'))
+const Profile = lazy(() => import('@/pages/Dashboard/Common/Profile.jsx'))
+const BookParcel = lazy(() => import('@/pages/Dashboard/User/BookParcel.jsx'))
+const MyParcels = lazy(() => import('@/pages/Dashboard/User/MyParcels.jsx'))
+const DeliveryList = lazy(() => import('@/pages/Dashboard/DeliveryMen/DeliveryList.jsx'))
+const Reviews = lazy(() => import('@/pages/Dashboard/DeliveryMen/Reviews.jsx'))
+const AllUsers = lazy(() => import('@/components/Dashboard/Admin/AllUsers.jsx'))
+const AllParcels = lazy(() => import('@/components/Dashboard/Admin/AllParcels.jsx'))
+const AllDeliveryMen = lazy(() => import('@/components/Dashboard/Admin/AllDeliveryMen.jsx'))
+
+const withRole = (roles, element) => <RoleRoute roles={roles}>{element}</RoleRoute>
 
 export const router = createBrowserRouter([
     {
@@ -25,65 +31,35 @@ export const router = createBrowserRouter([
         element: <Main />,
         errorElement: <ErrorPage />,
         children: [
-            {
-                path: '/',
-                element: <Home />,
-            },
-            {
-                path: '/about',
-                element: <About></About>
-            },
-            {
-                path: '/contact',
-                element: <Contact></Contact>
-            }
-
+            { index: true, element: <Home /> },
+            { path: 'about', element: <About /> },
+            { path: 'contact', element: <Contact /> },
         ],
     },
-    { path: '/login', element: <Login></Login> },
-    { path: '/signup', element: <SignUp></SignUp> },
+    { path: '/login', element: <Login /> },
+    { path: '/signup', element: <SignUp /> },
     {
         path: '/dashboard',
-        element: <DashboardLayout></DashboardLayout>,
+        element: (
+            <PrivateRoute>
+                <DashboardLayout />
+            </PrivateRoute>
+        ),
+        errorElement: <ErrorPage />,
         children: [
-            {
-                path: 'statistics',
-                element: <PrivateRoute><Statistics></Statistics></PrivateRoute>
-            },
-            {
-                path: 'book-parcel',
-                element: <PrivateRoute><BookParcel></BookParcel></PrivateRoute>
-            },
-            {
-                path: 'my-parcels',
-                element: <PrivateRoute><MyParcels></MyParcels></PrivateRoute>
-            },
-            {
-                path: 'all-parcels',
-                element: <PrivateRoute><AllParcels></AllParcels></PrivateRoute>
-            },
-            {
-                path: 'profile',
-                element: <PrivateRoute><Profile></Profile></PrivateRoute>
-            },
-            {
-                path: 'all-users',
-                element: <PrivateRoute> <AllUsers></AllUsers></PrivateRoute>
-            },
-            {
-                path: 'delivery-men',
-                element: <PrivateRoute><AllDeliveryMen></AllDeliveryMen></PrivateRoute>
-            },
-            {
-                path: 'my-deliveries',
-                element: <PrivateRoute><DeliveryList></DeliveryList></PrivateRoute>
-            },
-            {
-                path: 'my-reviews',
-                element: <PrivateRoute><Reviews></Reviews></PrivateRoute>
-            },
-
-        ]
-    }
+            { index: true, element: <DashboardHome /> },
+            { path: 'profile', element: <Profile /> },
+            // customer
+            { path: 'book-parcel', element: withRole(['user'], <BookParcel />) },
+            { path: 'my-parcels', element: withRole(['user'], <MyParcels />) },
+            // delivery partner
+            { path: 'my-deliveries', element: withRole(['DeliveryMen'], <DeliveryList />) },
+            { path: 'my-reviews', element: withRole(['DeliveryMen'], <Reviews />) },
+            // admin
+            { path: 'statistics', element: withRole(['admin'], <Statistics />) },
+            { path: 'all-parcels', element: withRole(['admin'], <AllParcels />) },
+            { path: 'all-users', element: withRole(['admin'], <AllUsers />) },
+            { path: 'delivery-men', element: withRole(['admin'], <AllDeliveryMen />) },
+        ],
+    },
 ])
-

@@ -1,131 +1,97 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
+import toast from 'react-hot-toast';
 import { CardElement, useElements, useStripe } from '@stripe/react-stripe-js';
-import './CheckoutForm.css';
+import { Loader2, Lock } from 'lucide-react';
 import { Button } from '../ui/button.jsx';
 import useAxiosSecure from '@/hooks/useAxiosSecure.jsx';
 import useAuth from '@/hooks/useAuth.jsx';
+import { useTheme } from '@/components/theme-provider.jsx';
+import { formatPrice } from '@/lib/parcel.js';
 
-const CheckoutForm = ({ parcelId, parcel, closeModal, onPaymentSuccess }) => {
+const CheckoutForm = ({ parcel, onPaymentSuccess }) => {
     const stripe = useStripe();
     const elements = useElements();
     const { user } = useAuth();
+    const { theme } = useTheme();
     const axiosSecure = useAxiosSecure();
-    const [clientSecret, setClientSecret] = useState("");
-    const [cardError, setCardError] = useState("");
+    const [clientSecret, setClientSecret] = useState('');
+    const [cardError, setCardError] = useState('');
     const [processing, setProcessing] = useState(false);
 
     useEffect(() => {
-        if (parcel?.price && parcel?.price > 1) {
-            getClientSecret({ price: parcel?.price });
-        }
-    }, [parcel?.price]);
-
-    const getClientSecret = async (price) => {
-        try {
-            const { data } = await axiosSecure.post(`/create-payment-intent`, price);
-            console.log(data);
-            setClientSecret(data?.clientSecret);
-        } catch (error) {
-            console.error('Error getting client secret:', error);
-        }
-    };
+        if (!parcel?.price || parcel.price <= 1) return;
+        axiosSecure
+            .post('/create-payment-intent', { price: parcel.price })
+            .then(({ data }) => setClientSecret(data?.clientSecret))
+            .catch(() => setCardError('Could not start the payment. Please try again later.'));
+    }, [parcel?.price, axiosSecure]);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
-        setProcessing(true);
-
-        if (!stripe || !elements) {
-            return;
-        }
+        if (!stripe || !elements || !clientSecret) return;
 
         const card = elements.getElement(CardElement);
+        if (!card) return;
 
-        if (card == null) {
-            return;
-        }
+        setProcessing(true);
+        setCardError('');
 
-
-        const { error, paymentMethod } = await stripe.createPaymentMethod({
-            type: 'card',
-            card,
+        const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
+            payment_method: {
+                card,
+                billing_details: {
+                    name: user?.displayName || undefined,
+                    email: user?.email,
+                },
+            },
         });
+
+        setProcessing(false);
 
         if (error) {
-            console.log('[error]', error);
             setCardError(error.message);
-            setProcessing(false);
-            return;
-        } else {
-            console.log('[PaymentMethod]', paymentMethod);
-            setCardError("");
-        }
-
-        // confirm card payment
-        const { paymentIntent, error: intentError } = await stripe.confirmCardPayment(clientSecret, {
-            payment_method: {
-                card: card,
-                billing_details: {
-                    name: user?.name,
-                    email: user?.email
-                },
-            }
-        });
-
-        if (intentError) {
-            console.log('[error]', intentError);
-            setCardError(intentError.message);
-            setProcessing(false);
             return;
         }
 
-        if (paymentIntent.status === 'succeeded') {
-            console.log('Payment succeeded, paymentIntent:', paymentIntent);
-            const paymentInfo = {
-                email: user?.email,
-                transactionId: paymentIntent.id,
-                price: parcel?.price,
-                date: new Date(),
-                status: 'pending',
-                name: parcel?.recipientName,
-                phoneNumber: parcel?.recipientPhoneNumber,
-                address: parcel?.recipientAddress,
-                parcelType: parcel?.parcelType,
-            }
-            console.log(paymentInfo);
-
+        if (paymentIntent?.status === 'succeeded') {
+            toast.success('Payment successful — thank you!');
             onPaymentSuccess();
-
-
         }
-        setProcessing(false);
     };
 
+    const dark = theme === 'dark';
+
     return (
-        <>
-            <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className='space-y-4'>
+            <div className='rounded-lg border border-input bg-card px-3 py-3.5 shadow-sm focus-within:border-ring focus-within:ring-4 focus-within:ring-ring/15'>
                 <CardElement
                     options={{
                         style: {
                             base: {
-                                fontSize: '16px',
-                                color: '#424770',
-                                '::placeholder': {
-                                    color: '#aab7c4',
-                                },
+                                fontSize: '15px',
+                                fontFamily: '"Plus Jakarta Sans", system-ui, sans-serif',
+                                color: dark ? '#f1f3f8' : '#141a2e',
+                                '::placeholder': { color: dark ? '#9aa1b2' : '#6b7280' },
                             },
-                            invalid: {
-                                color: '#9e2146',
-                            },
+                            invalid: { color: dark ? '#f87171' : '#dc2626' },
                         },
                     }}
                 />
-                <Button disabled={!stripe || !clientSecret || processing} className='w-full' type="submit">
-                    Pay ${parcel?.price}
-                </Button>
-            </form>
-            {cardError && <p className="text-red-500">{cardError}</p>}
-        </>
+            </div>
+            {cardError && <p className='text-sm text-destructive'>{cardError}</p>}
+            <Button disabled={!stripe || !clientSecret || processing} className='w-full' size='lg' type='submit'>
+                {processing ? <Loader2 className='h-4 w-4 animate-spin' /> : <Lock className='h-4 w-4' />}
+                Pay {formatPrice(parcel?.price)}
+            </Button>
+            <p className='text-center text-xs text-muted-foreground'>Payments are processed securely by Stripe.</p>
+        </form>
     );
+};
+
+CheckoutForm.propTypes = {
+    parcel: PropTypes.object,
+    onPaymentSuccess: PropTypes.func.isRequired,
 };
 
 export default CheckoutForm;
