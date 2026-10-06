@@ -4,8 +4,8 @@ import toast from 'react-hot-toast';
 import { Rating } from "@smastrom/react-rating";
 import "@smastrom/react-rating/style.css";
 import { Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import useAxiosSecure from "@/hooks/useAxiosSecure";
-import useAuth from '@/hooks/useAuth.jsx';
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -22,7 +22,7 @@ const RATING_LABELS = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent'];
 
 const ReviewModal = ({ isOpen, onClose, parcel }) => {
     const axiosSecure = useAxiosSecure();
-    const { user } = useAuth();
+    const queryClient = useQueryClient();
     const [rating, setRating] = useState(0);
     const [submitting, setSubmitting] = useState(false);
 
@@ -36,20 +36,17 @@ const ReviewModal = ({ isOpen, onClose, parcel }) => {
 
         setSubmitting(true);
         try {
+            // Reviewer and rider details are filled in by the API from the parcel
             await axiosSecure.post('/reviews', {
+                parcelId: parcel._id,
                 rating,
                 feedback: e.target.feedback.value,
-                deliveryManId: parcel.deliveryManId,
-                parcelId: parcel._id,
-                reviewerEmail: user?.email,
-                reviewerName: user?.displayName,
-                reviewerImage: user?.photoURL,
-                reviewDate: new Date(),
             });
+            queryClient.invalidateQueries({ queryKey: ['my-parcel'] });
             toast.success('Thanks for your review!');
             onClose();
-        } catch {
-            toast.error('Could not submit your review. Please try again.');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not submit your review. Please try again.');
         } finally {
             setSubmitting(false);
         }

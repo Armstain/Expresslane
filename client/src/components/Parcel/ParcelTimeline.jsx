@@ -4,7 +4,7 @@ import { calculateApproximateDeliveryDate, formatDate } from "@/api/utils/dateUt
 import { cn } from "@/lib/utils";
 
 // Turn a parcel's status into the four tracking milestones
-export const getTimeline = (parcel) => {
+const getTimeline = (parcel) => {
   const status = parcel?.status;
   const eta = parcel?.approximateDeliveryDate
     ? formatDate(parcel.approximateDeliveryDate)

@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import Confetti from "react-confetti";
 import { loadStripe } from "@stripe/stripe-js";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ChevronRight, CreditCard, Package, PackagePlus, Star, X } from "lucide-react";
+import { BadgeCheck, ChevronRight, CreditCard, Package, PackagePlus, Star, X } from "lucide-react";
 import useAuth from "@/hooks/useAuth.jsx";
 import useAxiosSecure from "@/hooks/useAxiosSecure.jsx";
 import { calculateApproximateDeliveryDate, formatDate } from "@/api/utils/dateUtils.js";
@@ -18,6 +18,7 @@ import EmptyState from "@/components/Shared/EmptyState.jsx";
 import LoadingSpinner from "@/components/Shared/LoadingSpinner.jsx";
 import PageHeader from "@/components/Shared/PageHeader.jsx";
 import StatusBadge from "@/components/Shared/StatusBadge.jsx";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -81,12 +82,20 @@ const MyParcels = () => {
       )}
       {parcel.status === "delivered" && (
         <>
-          <Button size="sm" variant="outline" onClick={() => setReviewParcel(parcel)}>
-            <Star className="h-4 w-4" /> Review
-          </Button>
-          <Button size="sm" onClick={() => setPayParcel(parcel)} disabled={!stripePromise}>
-            <CreditCard className="h-4 w-4" /> Pay
-          </Button>
+          {!parcel.reviewed && (
+            <Button size="sm" variant="outline" onClick={() => setReviewParcel(parcel)}>
+              <Star className="h-4 w-4" /> Review
+            </Button>
+          )}
+          {parcel.paymentStatus === "paid" ? (
+            <Badge variant="success" className="h-9 justify-center px-3">
+              <BadgeCheck className="h-4 w-4" /> Paid
+            </Badge>
+          ) : (
+            <Button size="sm" onClick={() => setPayParcel(parcel)} disabled={!stripePromise}>
+              <CreditCard className="h-4 w-4" /> Pay
+            </Button>
+          )}
         </>
       )}
     </>

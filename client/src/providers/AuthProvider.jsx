@@ -58,40 +58,47 @@ const AuthProvider = ({ children }) => {
         refreshProfile()
     }, [])
 
-    // Get token from server
-    const getToken = async email => {
+    // Exchange the Firebase ID token for the API's session cookie
+    const getToken = async firebaseUser => {
+        const idToken = await firebaseUser.getIdToken()
         const { data } = await axios.post(
             `${API_URL}/jwt`,
-            { email },
+            { idToken },
             { withCredentials: true }
         )
         return data
     }
 
-    // save user
+    // Create or update the signed-in user's profile. The API takes the email
+    // and role from the session, so only profile fields are sent.
     const saveUser = useCallback(async user => {
-        const currentUser = {
+        const profile = {
             displayName: user.displayName,
             photoURL: user.photoURL,
             phoneNumber: user.phoneNumber,
-            email: user.email,
-            role: 'user',
         }
-        const { data } = await axios.put(`${API_URL}/user`, currentUser)
-        return data
+        const put = () => axios.put(`${API_URL}/user`, profile, { withCredentials: true })
+        try {
+            return (await put()).data
+        } catch (err) {
+            // Right after sign-up the session cookie may not exist yet
+            if (err.response?.status !== 401 || !auth.currentUser) throw err
+            await getToken(auth.currentUser)
+            return (await put()).data
+        }
     }, [])
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async currentUser => {
             setUser(currentUser)
             if (currentUser) {
-                // Wait for the auth cookie before protected queries start firing
+                // Wait for the session cookie and profile before protected queries start firing
                 try {
-                    await getToken(currentUser.email)
+                    await getToken(currentUser)
+                    await saveUser(currentUser)
                 } catch (err) {
-                    console.error('Failed to get auth token', err)
+                    console.error('Failed to start session', err)
                 }
-                saveUser(currentUser).catch(err => console.error('Failed to save user', err))
             }
             setLoading(false)
         })

@@ -1,7 +1,7 @@
 import PropTypes from "prop-types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-export const getInitials = (name = "", email = "") => {
+const getInitials = (name = "", email = "") => {
   const source = name?.trim() || email?.split("@")[0] || "?";
   return source
     .split(/\s+/)

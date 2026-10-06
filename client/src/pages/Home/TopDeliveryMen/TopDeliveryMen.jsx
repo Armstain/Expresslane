@@ -1,43 +1,18 @@
-import { useQueries } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Package, Star, Trophy } from "lucide-react";
 import { axiosPublic } from "@/api/axiosPublic.js";
 import UserAvatar from "@/components/Shared/UserAvatar.jsx";
 import { Skeleton } from "@/components/ui/skeleton";
 import Reveal from "@/components/Shared/Reveal.jsx";
 
-const fetchJson = (url) => async () => (await axiosPublic.get(url)).data;
-
 const TopDeliveryMen = () => {
-  const [usersQ, parcelsQ, reviewsQ] = useQueries({
-    queries: [
-      { queryKey: ["users"], queryFn: fetchJson("/users") },
-      { queryKey: ["parcels"], queryFn: fetchJson("/parcels") },
-      { queryKey: ["reviews"], queryFn: fetchJson("/reviews") },
-    ],
+  // Ranked on the server; only public fields (name, photo, counts) come back
+  const { data: topDeliveryMen = [], isLoading, isError } = useQuery({
+    queryKey: ["top-delivery-men"],
+    queryFn: async () => (await axiosPublic.get("/top-delivery-men")).data,
   });
 
-  const isLoading = usersQ.isLoading || parcelsQ.isLoading || reviewsQ.isLoading;
-  const isError = usersQ.isError || parcelsQ.isError || reviewsQ.isError;
   if (isError) return null;
-
-  const deliveryMen = (usersQ.data || []).filter((u) => u.role === "DeliveryMen");
-  const parcels = parcelsQ.data || [];
-  const reviews = reviewsQ.data || [];
-
-  const topDeliveryMen = deliveryMen
-    .map((man) => {
-      const numDeliveries = parcels.filter(
-        (p) => p.deliveryManId === man._id && p.status === "delivered"
-      ).length;
-      const own = reviews.filter((r) => r.deliveryManId === man._id);
-      const averageRating = own.length
-        ? own.reduce((sum, r) => sum + Number(r.rating || 0), 0) / own.length
-        : null;
-      return { ...man, numDeliveries, averageRating };
-    })
-    .sort((a, b) => b.numDeliveries - a.numDeliveries || (b.averageRating ?? 0) - (a.averageRating ?? 0))
-    .slice(0, 3);
-
   if (!isLoading && topDeliveryMen.length === 0) return null;
 
   return (
@@ -69,7 +44,6 @@ const TopDeliveryMen = () => {
                   <UserAvatar
                     src={man.photoURL}
                     name={man.displayName}
-                    email={man.email}
                     className="mx-auto h-20 w-20 ring-4 ring-accent"
                   />
                   <h3 className="mt-4 text-lg font-semibold">{man.displayName || "Delivery hero"}</h3>

@@ -4,7 +4,9 @@
 
 **Parcel delivery, simplified.** Book a pickup in under a minute, follow every step of the journey, and pay once it arrives.
 
-[Live demo](https://expreane-c2384.web.app/) · [Features](#features) · [Screenshots](#screenshots) · [Getting started](#getting-started)
+[Live demo](https://expreane-c2384.web.app/) · [Features](#features) · [Screenshots](#screenshots) · [API](#api) · [Getting started](#getting-started)
+
+[![CI](https://github.com/Armstain/Expresslane/actions/workflows/ci.yml/badge.svg)](https://github.com/Armstain/Expresslane/actions/workflows/ci.yml)
 
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)
@@ -72,9 +74,10 @@ ExpressLane is a full-stack delivery platform with three roles, each with its ow
 | --- | --- |
 | Front end | React 18, Vite, React Router 6, TanStack Query, Tailwind CSS, shadcn/ui (Radix UI), Lucide icons |
 | Charts & maps | ApexCharts, Leaflet / React Leaflet |
-| Auth | Firebase Authentication (email + Google) with an HTTP-only JWT cookie for the API |
-| Payments | Stripe Payment Intents + Stripe Elements |
-| Back end | Node.js, Express, MongoDB |
+| Auth | Firebase Authentication (email + Google); the API verifies Firebase ID tokens with Firebase Admin and issues an HTTP-only session cookie |
+| Payments | Stripe Payment Intents + Stripe Elements, verified server-side |
+| Back end | Node.js, Express, MongoDB, Helmet, express-rate-limit |
+| Testing & CI | Node's built-in test runner + Supertest against a real MongoDB; GitHub Actions runs lint, build and tests |
 | Hosting | Firebase Hosting (client), Vercel (API) |
 
 ## Project structure
@@ -93,9 +96,45 @@ client/
     routes/         router, auth guard and role guard
     lib/            shared parcel rules (pricing, statuses)
 server/
-  index.js          Express API
+  index.js          entry point (local server and Vercel handler)
+  src/
+    app.js          Express app factory (dependencies injected for testing)
+    config.js       environment variables, validated on startup
+    db.js           MongoDB connection and indexes
+    middleware/     session auth and role guards
+    routes/         auth, users, parcels, reviews, stats, payments
+    lib/            validation, errors and parcel rules
+  test/             API tests
 docs/screenshots/   images used in this README
 ```
+
+## API
+
+Every protected route checks the session cookie, loads the user from the database and checks their role. Roles are never taken from the request or the token.
+
+| Method | Route | Access | Purpose |
+| --- | --- | --- | --- |
+| POST | `/jwt` | Public (rate-limited) | Exchange a Firebase ID token for a session cookie |
+| GET | `/logout` | Public | Clear the session cookie |
+| PUT | `/user` | Signed in | Create or update your own profile (new accounts are always customers) |
+| GET | `/user/:email` | Self or admin | Profile and role |
+| GET | `/users` | Admin | All users, optionally `?role=` |
+| PATCH | `/users/update/:id` | Admin | Change a user's role |
+| GET | `/top-delivery-men` | Public | Leaderboard with public fields only |
+| POST | `/parcel` | Signed in | Book a parcel — price is calculated on the server |
+| GET | `/my-parcel/:email` | Self or admin | A customer's parcels |
+| DELETE | `/my-parcel/:id` | Owner (pending only) or admin | Cancel or delete a parcel |
+| GET | `/parcels` | Admin | All parcels |
+| PATCH | `/parcel/:id` | Admin, or the assigned delivery man | Assign a rider, or mark delivered / cancelled |
+| GET | `/my-delivery/:email` | Delivery man (self) or admin | Parcels assigned to a rider |
+| GET | `/reviews` | Public | Reviews without reviewer emails |
+| POST | `/reviews` | Parcel owner | One review per delivered parcel |
+| GET | `/reviews/delivery-man/:id` | That delivery man or admin | Reviews for a rider |
+| GET | `/statistics` | Public | Headline counts |
+| GET | `/bookingsByDate` | Admin | Bookings per day |
+| POST | `/create-payment-intent` | Parcel owner | Start a Stripe payment for a delivered parcel |
+| POST | `/payments` | Parcel owner | Record a payment after verifying it with Stripe |
+| GET | `/payments` | Signed in | Your payment history |
 
 ## Getting started
 
@@ -108,18 +147,22 @@ cd server
 npm install
 ```
 
-Create `server/.env`:
-
-```env
-DB_USER=your-mongodb-user
-DB_PASS=your-mongodb-password
-ACCESS_TOKEN_SECRET=a-long-random-string
-STRIPE_SECRET_KEY=sk_test_...
-```
-
 ```bash
-npm run dev        # http://localhost:7000
+cp .env.example .env   # then fill in the values
+npm run dev            # http://localhost:7000
 ```
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `MONGODB_URI` | Yes | MongoDB connection string |
+| `DB_NAME` | No | Database name (default `ExpressLane`) |
+| `ACCESS_TOKEN_SECRET` | Yes | Secret for signing session cookies |
+| `FIREBASE_PROJECT_ID` | Yes | Your Firebase project id, used to verify sign-ins |
+| `STRIPE_SECRET_KEY` | For payments | Stripe secret key |
+| `CLIENT_ORIGINS` | No | Comma-separated allowed origins |
+| `NODE_ENV` | In production | Set to `production` for secure cross-site cookies |
+
+The server refuses to start if a required variable is missing.
 
 ### 2. Client
 
@@ -130,13 +173,23 @@ npm install
 npm run dev                  # http://localhost:5173
 ```
 
+### Tests
+
+The API tests run against a real MongoDB. Point them at any instance with `TEST_MONGODB_URI`, or leave it unset to start a temporary in-memory MongoDB:
+
+```bash
+cd server
+TEST_MONGODB_URI=mongodb://localhost:27017 npm test
+```
+
+The suite covers sign-in, role checks, ownership rules, server-side pricing, reviews and payment verification.
+
 ### Roles
 
 New accounts start as customers. Promote a user to **DeliveryMen** or **admin** from the admin *Users* page, or by editing the `role` field in the `users` collection.
 
 ## Roadmap
 
-- Enforce roles and ownership checks on every API route
-- Verify Firebase ID tokens on the server before issuing the session cookie
-- Record payments server-side with Stripe webhooks
+- Stripe webhooks as a second confirmation path for payments
+- Real-time status updates with WebSockets
 - Move from MongoDB to PostgreSQL for relational parcel/rider/review data

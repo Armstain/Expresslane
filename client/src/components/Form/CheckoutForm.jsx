@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { CardElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { Loader2, Lock } from 'lucide-react';
 import { Button } from '../ui/button.jsx';
@@ -15,17 +16,21 @@ const CheckoutForm = ({ parcel, onPaymentSuccess }) => {
     const { user } = useAuth();
     const { theme } = useTheme();
     const axiosSecure = useAxiosSecure();
+    const queryClient = useQueryClient();
     const [clientSecret, setClientSecret] = useState('');
     const [cardError, setCardError] = useState('');
     const [processing, setProcessing] = useState(false);
 
+    // The API looks up the amount from the parcel itself
     useEffect(() => {
-        if (!parcel?.price || parcel.price <= 1) return;
+        if (!parcel?._id) return;
         axiosSecure
-            .post('/create-payment-intent', { price: parcel.price })
+            .post('/create-payment-intent', { parcelId: parcel._id })
             .then(({ data }) => setClientSecret(data?.clientSecret))
-            .catch(() => setCardError('Could not start the payment. Please try again later.'));
-    }, [parcel?.price, axiosSecure]);
+            .catch((err) =>
+                setCardError(err.response?.data?.message || 'Could not start the payment. Please try again later.')
+            );
+    }, [parcel?._id, axiosSecure]);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -55,6 +60,13 @@ const CheckoutForm = ({ parcel, onPaymentSuccess }) => {
         }
 
         if (paymentIntent?.status === 'succeeded') {
+            // Let the API confirm the payment with Stripe and mark the parcel paid
+            try {
+                await axiosSecure.post('/payments', { paymentIntentId: paymentIntent.id });
+            } catch {
+                toast.error('Payment went through, but we could not update your parcel yet. Please refresh shortly.');
+            }
+            queryClient.invalidateQueries({ queryKey: ['my-parcel'] });
             toast.success('Payment successful — thank you!');
             onPaymentSuccess();
         }
