@@ -1,5 +1,7 @@
+const { execSync } = require('node:child_process');
+const path = require('node:path');
 const request = require('supertest');
-const { connectDatabase } = require('../src/db');
+const { createPrisma } = require('../src/db');
 const { createApp } = require('../src/app');
 
 const config = {
@@ -35,52 +37,54 @@ const createFakeStripe = () => {
   };
 };
 
-// Use TEST_MONGODB_URI when given (e.g. a local or CI MongoDB),
-// otherwise start a throwaway in-memory server.
-const startDatabase = async () => {
-  let uri = process.env.TEST_MONGODB_URI;
-  let memoryServer;
-  if (!uri) {
-    const { MongoMemoryServer } = require('mongodb-memory-server-core');
-    memoryServer = await MongoMemoryServer.create();
-    uri = memoryServer.getUri();
+const testDatabaseUrl = () => {
+  const url = process.env.TEST_DATABASE_URL;
+  if (!url) throw new Error('Set TEST_DATABASE_URL to a disposable Postgres database to run the tests');
+  // Every test wipes all tables, so refuse anything that doesn't look like a test database
+  if (!/test/i.test(new URL(url).pathname)) {
+    throw new Error('TEST_DATABASE_URL must point to a database whose name contains "test"');
   }
-  const dbName = `expresslane_test_${process.pid}_${Date.now()}`;
-  const db = await connectDatabase(uri, dbName);
-  return {
-    db,
-    stop: async () => {
-      await db.db.dropDatabase();
-      await db.client.close();
-      if (memoryServer) await memoryServer.stop();
-    },
-  };
+  return url;
 };
 
 const setup = async () => {
-  const { db, stop } = await startDatabase();
+  const url = testDatabaseUrl();
+  execSync('npx prisma migrate deploy', {
+    cwd: path.join(__dirname, '..'),
+    env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url },
+    stdio: 'ignore',
+  });
+
+  const prisma = createPrisma(url);
   const stripe = createFakeStripe();
-  const app = createApp({ config, db, verifyIdToken, stripe });
+  const app = createApp({ config, prisma, verifyIdToken, stripe });
 
   // Create a user with a role and return a supertest agent holding their session cookie
-  const signIn = async (email, role = 'user', extra = {}) => {
-    await db.users.updateOne(
-      { email },
-      { $set: { role, displayName: extra.displayName || email.split('@')[0], ...extra }, $setOnInsert: { email } },
-      { upsert: true }
-    );
+  const signIn = async (email, role = 'customer', extra = {}) => {
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: { role, ...extra },
+      create: { email, role, displayName: email.split('@')[0], ...extra },
+    });
     const agent = request.agent(app);
     await agent.post('/jwt').send({ idToken: `valid:${email}` }).expect(200);
-    const user = await db.users.findOne({ email });
     return Object.assign(agent, { user });
   };
 
   const reset = async () => {
-    await Promise.all([db.users, db.parcels, db.reviews, db.payments].map((c) => c.deleteMany({})));
+    await prisma.$executeRawUnsafe('TRUNCATE payments, reviews, parcels, users CASCADE');
     stripe.intents.clear();
   };
 
-  return { app, db, stripe, signIn, reset, stop, request: () => request(app) };
+  return {
+    app,
+    prisma,
+    stripe,
+    signIn,
+    reset,
+    stop: () => prisma.$disconnect(),
+    request: () => request(app),
+  };
 };
 
 const parcelBody = (overrides = {}) => ({

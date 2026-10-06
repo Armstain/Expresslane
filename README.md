@@ -12,7 +12,9 @@
 ![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)
-![MongoDB](https://img.shields.io/badge/MongoDB-6-47A248?logo=mongodb&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-hosted-3FCF8E?logo=supabase&logoColor=white)
 ![Stripe](https://img.shields.io/badge/Stripe-payments-635BFF?logo=stripe&logoColor=white)
 
 ![ExpressLane landing page](docs/screenshots/landing-light.png)
@@ -76,8 +78,9 @@ ExpressLane is a full-stack delivery platform with three roles, each with its ow
 | Charts & maps | ApexCharts, Leaflet / React Leaflet |
 | Auth | Firebase Authentication (email + Google); the API verifies Firebase ID tokens with Firebase Admin and issues an HTTP-only session cookie |
 | Payments | Stripe Payment Intents + Stripe Elements, verified server-side |
-| Back end | Node.js, Express, MongoDB, Helmet, express-rate-limit |
-| Testing & CI | Node's built-in test runner + Supertest against a real MongoDB; GitHub Actions runs lint, build and tests |
+| Back end | Node.js, Express, Helmet, express-rate-limit |
+| Database | PostgreSQL on Supabase, Prisma ORM (schema, migrations, typed queries) with the `pg` driver adapter |
+| Testing & CI | Node's built-in test runner + Supertest against a real Postgres database; GitHub Actions runs lint, build and tests |
 | Hosting | Firebase Hosting (client), Vercel (API) |
 
 ## Project structure
@@ -100,10 +103,14 @@ server/
   src/
     app.js          Express app factory (dependencies injected for testing)
     config.js       environment variables, validated on startup
-    db.js           MongoDB connection and indexes
+    db.js           Prisma Client setup
     middleware/     session auth and role guards
     routes/         auth, users, parcels, reviews, stats, payments
-    lib/            validation, errors and parcel rules
+    lib/            validation, errors, parcel rules and response mappers
+  prisma/
+    schema.prisma   tables, relations and enums
+    migrations/     versioned SQL migrations (incl. CHECK constraints)
+    seed.js         demo data
   test/             API tests
 docs/screenshots/   images used in this README
 ```
@@ -138,7 +145,7 @@ Every protected route checks the session cookie, loads the user from the databas
 
 ## Getting started
 
-**Prerequisites:** Node.js 18+, a MongoDB database, a Firebase project with Email/Password and Google sign-in enabled, and a Stripe account in test mode.
+**Prerequisites:** Node.js 20+, a PostgreSQL database ([Supabase](https://supabase.com) free tier, or local Postgres), a Firebase project with Email/Password and Google sign-in enabled, and a Stripe account in test mode.
 
 ### 1. API
 
@@ -149,13 +156,17 @@ npm install
 
 ```bash
 cp .env.example .env   # then fill in the values
+npm run db:deploy      # create the tables
+npm run db:seed        # optional demo data
 npm run dev            # http://localhost:7000
 ```
 
+**Using Supabase:** create a project, open **Connect → ORMs → Prisma**, and copy the two connection strings into `DATABASE_URL` (transaction pooler, for the app) and `DIRECT_URL` (for migrations). See [docs/database.md](docs/database.md) for the day-to-day workflow.
+
 | Variable | Required | Description |
 | --- | --- | --- |
-| `MONGODB_URI` | Yes | MongoDB connection string |
-| `DB_NAME` | No | Database name (default `ExpressLane`) |
+| `DATABASE_URL` | Yes | Postgres connection used by the app |
+| `DIRECT_URL` | For migrations on Supabase | Direct/session connection used by Prisma Migrate |
 | `ACCESS_TOKEN_SECRET` | Yes | Secret for signing session cookies |
 | `FIREBASE_PROJECT_ID` | Yes | Your Firebase project id, used to verify sign-ins |
 | `STRIPE_SECRET_KEY` | For payments | Stripe secret key |
@@ -175,21 +186,21 @@ npm run dev                  # http://localhost:5173
 
 ### Tests
 
-The API tests run against a real MongoDB. Point them at any instance with `TEST_MONGODB_URI`, or leave it unset to start a temporary in-memory MongoDB:
+The API tests run against a real Postgres database. They apply migrations and empty the tables between tests, so use a throwaway database whose name contains `test`:
 
 ```bash
+docker run -d --name expresslane-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=expresslane_test -p 5432:5432 postgres:16
 cd server
-TEST_MONGODB_URI=mongodb://localhost:27017 npm test
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/expresslane_test npm test
 ```
 
-The suite covers sign-in, role checks, ownership rules, server-side pricing, reviews and payment verification.
+The suite covers sign-in, role checks, ownership rules, server-side pricing, reviews, payment verification and the database's own constraints.
 
 ### Roles
 
-New accounts start as customers. Promote a user to **DeliveryMen** or **admin** from the admin *Users* page, or by editing the `role` field in the `users` collection.
+New accounts start as customers. Promote a user to **Delivery partner** or **Administrator** from the admin *Users* page, or by changing the `role` column in the `users` table (Supabase Table Editor or `npm run db:studio`).
 
 ## Roadmap
 
 - Stripe webhooks as a second confirmation path for payments
-- Real-time status updates with WebSockets
-- Move from MongoDB to PostgreSQL for relational parcel/rider/review data
+- Real-time status updates (Supabase Realtime or WebSockets)

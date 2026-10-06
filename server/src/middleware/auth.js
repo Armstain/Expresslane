@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { HttpError, asyncHandler } = require('../lib/http');
 
-const createAuth = ({ jwtSecret, users }) => {
+const createAuth = ({ jwtSecret, prisma }) => {
   // Valid session cookie → req.auth = { email }
   const authenticate = (req, res, next) => {
     const token = req.cookies?.token;
@@ -15,7 +15,7 @@ const createAuth = ({ jwtSecret, users }) => {
 
   // Attach the database user; roles always come from the database, never the token
   const loadUser = asyncHandler(async (req, res, next) => {
-    const user = await users.findOne({ email: req.auth.email });
+    const user = await prisma.user.findUnique({ where: { email: req.auth.email } });
     if (!user) throw new HttpError(403, 'Account not found');
     req.user = user;
     next();
@@ -23,6 +23,7 @@ const createAuth = ({ jwtSecret, users }) => {
 
   const requireUser = [authenticate, loadUser];
 
+  // Roles use database names: 'customer', 'rider', 'admin'
   const requireRole = (...roles) => [
     ...requireUser,
     (req, res, next) =>

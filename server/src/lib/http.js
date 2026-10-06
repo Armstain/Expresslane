@@ -16,7 +16,10 @@ const notFound = (req, res) => {
 const errorHandler = (err, req, res, next) => {
   if (err instanceof HttpError) return res.status(err.status).send({ message: err.message });
   if (err.type === 'entity.parse.failed') return res.status(400).send({ message: 'Malformed JSON body' });
-  if (err.code === 11000) return res.status(409).send({ message: 'This record already exists' });
+  // Prisma error codes: unique violation, foreign-key violation, record not found
+  if (err.code === 'P2002') return res.status(409).send({ message: 'This record already exists' });
+  if (err.code === 'P2003') return res.status(409).send({ message: 'This record is still in use' });
+  if (err.code === 'P2025') return res.status(404).send({ message: 'Not found' });
   console.error(err);
   return res.status(500).send({ message: 'Something went wrong' });
 };

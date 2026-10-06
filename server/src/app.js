@@ -9,10 +9,10 @@ const { errorHandler, notFound } = require('./lib/http');
  * Build the Express app. Dependencies are passed in so tests can supply
  * a test database, a fake Firebase verifier and a fake Stripe client.
  */
-const createApp = ({ config, db, verifyIdToken, stripe = null }) => {
+const createApp = ({ config, prisma, verifyIdToken, stripe = null }) => {
   const app = express();
-  const auth = createAuth({ jwtSecret: config.jwtSecret, users: db.users });
-  const deps = { config, db, auth, verifyIdToken, stripe };
+  const auth = createAuth({ jwtSecret: config.jwtSecret, prisma });
+  const deps = { config, prisma, auth, verifyIdToken, stripe };
 
   app.set('trust proxy', 1);
   app.use(helmet());

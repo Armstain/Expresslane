@@ -2,7 +2,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const Stripe = require('stripe');
 const { config, assertConfig } = require('./src/config');
-const { connectDatabase } = require('./src/db');
+const { createPrisma } = require('./src/db');
 const { createApp } = require('./src/app');
 
 let appPromise;
@@ -12,12 +12,12 @@ const getApp = () => {
   if (!appPromise) {
     appPromise = (async () => {
       assertConfig(config);
-      const db = await connectDatabase(config.mongoUri, config.dbName);
+      const prisma = createPrisma(config.databaseUrl);
       // Verifying ID tokens only needs the project id, not a service account
       const firebase = initializeApp({ projectId: config.firebaseProjectId });
       const verifyIdToken = (token) => getAuth(firebase).verifyIdToken(token);
       const stripe = config.stripeSecretKey ? Stripe(config.stripeSecretKey) : null;
-      return createApp({ config, db, verifyIdToken, stripe });
+      return createApp({ config, prisma, verifyIdToken, stripe });
     })().catch((err) => {
       appPromise = undefined; // let the next request retry
       throw err;

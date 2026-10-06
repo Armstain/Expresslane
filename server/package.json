@@ -5,13 +5,21 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "node --test --test-concurrency=1 test/*.test.js"
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "REST API for ExpressLane parcel delivery",
   "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -20,15 +28,15 @@
     "firebase-admin": "^14.5.0",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
-    "mongodb": "^6.7.0",
+    "pg": "8.23.1",
+    "prisma": "7.10.0",
     "stripe": "^15.10.0"
   },
   "devDependencies": {
-    "mongodb-memory-server-core": "^11.3.0",
     "nodemon": "^3.1.14",
     "supertest": "^7.3.1"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19"
   }
 }

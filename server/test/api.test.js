@@ -16,16 +16,14 @@ beforeEach(async () => {
 // Book a parcel as `customer`, optionally assign it to `rider` and set a status
 const bookParcel = async (customer, { rider, status } = {}) => {
   const res = await customer.post('/parcel').send(parcelBody()).expect(201);
-  const _id = res.body.insertedId;
-  const updates = {};
-  if (rider) updates.deliveryManId = String(rider.user._id);
-  if (status) updates.status = status;
-  if (Object.keys(updates).length) {
-    const { ObjectId } = require('mongodb');
-    await t.db.parcels.updateOne({ _id: new ObjectId(_id) }, { $set: updates });
-  }
-  return _id;
+  const data = {};
+  if (rider) data.riderId = rider.user.id;
+  if (status) data.status = status;
+  if (Object.keys(data).length) await t.prisma.parcel.update({ where: { id: res.body._id }, data });
+  return res.body._id;
 };
+
+const setStatus = (id, status) => t.prisma.parcel.update({ where: { id }, data: { status } });
 
 describe('auth', () => {
   it('rejects an invalid Firebase token', async () => {
@@ -81,24 +79,26 @@ describe('users', () => {
   it('only lets admins change roles, to valid roles', async () => {
     const customer = await t.signIn('nadia@example.com');
     const admin = await t.signIn('admin@abc.com', 'admin');
-    const id = String(customer.user._id);
+    const id = customer.user.id;
     await customer.patch(`/users/update/${id}`).send({ role: 'admin' }).expect(403);
     await admin.patch(`/users/update/${id}`).send({ role: 'superuser' }).expect(400);
     await admin.patch('/users/update/not-an-id').send({ role: 'admin' }).expect(400);
-    await admin.patch(`/users/update/${String(admin.user._id)}`).send({ role: 'user' }).expect(400);
-    await admin.patch(`/users/update/${id}`).send({ role: 'DeliveryMen' }).expect(200);
-    assert.equal((await t.db.users.findOne({ _id: customer.user._id })).role, 'DeliveryMen');
+    await admin.patch(`/users/update/${admin.user.id}`).send({ role: 'user' }).expect(400);
+    const promoted = await admin.patch(`/users/update/${id}`).send({ role: 'DeliveryMen' }).expect(200);
+    assert.equal(promoted.body.role, 'DeliveryMen');
+    assert.equal((await t.prisma.user.findUnique({ where: { id } })).role, 'rider');
   });
 
   it('publishes a top delivery men list without private fields', async () => {
     const customer = await t.signIn('nadia@example.com');
-    const rider = await t.signIn('rafi@example.com', 'DeliveryMen', { phoneNumber: '018' });
+    const rider = await t.signIn('rafi@example.com', 'rider', { phone: '018' });
     await bookParcel(customer, { rider, status: 'delivered' });
     const res = await t.request().get('/top-delivery-men').expect(200);
     assert.equal(res.body.length, 1);
     assert.equal(res.body[0].numDeliveries, 1);
     assert.equal(res.body[0].email, undefined);
     assert.equal(res.body[0].phoneNumber, undefined);
+    assert.equal(res.body[0].phone, undefined);
   });
 });
 
@@ -109,10 +109,11 @@ describe('parcels', () => {
       .post('/parcel')
       .send(parcelBody({ price: 1, email: 'someone@else.com', status: 'delivered', parcelWeight: 1.5 }))
       .expect(201);
-    const parcel = await t.db.parcels.findOne({});
+    const [parcel] = (await customer.get('/my-parcel/nadia@example.com').expect(200)).body;
     assert.equal(parcel.price, 100);
     assert.equal(parcel.email, 'nadia@example.com');
     assert.equal(parcel.status, 'pending');
+    assert.equal(await t.prisma.parcel.count({ where: { priceCents: 10000 } }), 1);
   });
 
   it('validates the booking', async () => {
@@ -134,9 +135,9 @@ describe('parcels', () => {
 
   it('lets customers cancel only pending parcels', async () => {
     const nadia = await t.signIn('nadia@example.com');
-    const rider = await t.signIn('rafi@example.com', 'DeliveryMen');
+    const rider = await t.signIn('rafi@example.com', 'rider');
     const pending = await bookParcel(nadia);
-    const moving = await bookParcel(nadia, { rider, status: 'on the way' });
+    const moving = await bookParcel(nadia, { rider, status: 'on_the_way' });
     await nadia.delete(`/my-parcel/${moving}`).expect(409);
     await nadia.delete(`/my-parcel/${pending}`).expect(200);
   });
@@ -144,24 +145,25 @@ describe('parcels', () => {
   it('only assigns parcels to delivery men', async () => {
     const nadia = await t.signIn('nadia@example.com');
     const admin = await t.signIn('admin@abc.com', 'admin');
-    const rider = await t.signIn('rafi@example.com', 'DeliveryMen');
+    const rider = await t.signIn('rafi@example.com', 'rider');
     const id = await bookParcel(nadia);
     await nadia.patch(`/parcel/${id}`).send({ status: 'delivered' }).expect(403);
-    await admin.patch(`/parcel/${id}`).send({ deliveryManId: String(nadia.user._id) }).expect(400);
+    await admin.patch(`/parcel/${id}`).send({ deliveryManId: nadia.user.id }).expect(400);
     await admin
       .patch(`/parcel/${id}`)
-      .send({ deliveryManId: String(rider.user._id), approximateDeliveryDate: '2026-10-12' })
+      .send({ deliveryManId: rider.user.id, approximateDeliveryDate: '2026-10-12' })
       .expect(200);
-    const parcel = await t.db.parcels.findOne({});
+    const [parcel] = (await admin.get('/parcels').expect(200)).body;
     assert.equal(parcel.status, 'on the way');
-    assert.equal(parcel.deliveryManId, String(rider.user._id));
+    assert.equal(parcel.deliveryManId, rider.user.id);
+    assert.equal(parcel.approximateDeliveryDate, '2026-10-12');
   });
 
   it('lets a delivery man close out only their own parcels', async () => {
     const nadia = await t.signIn('nadia@example.com');
-    const rafi = await t.signIn('rafi@example.com', 'DeliveryMen');
-    const sumi = await t.signIn('sumi@example.com', 'DeliveryMen');
-    const id = await bookParcel(nadia, { rider: rafi, status: 'on the way' });
+    const rafi = await t.signIn('rafi@example.com', 'rider');
+    const sumi = await t.signIn('sumi@example.com', 'rider');
+    const id = await bookParcel(nadia, { rider: rafi, status: 'on_the_way' });
     await sumi.patch(`/parcel/${id}`).send({ status: 'delivered' }).expect(403);
     await rafi.patch(`/parcel/${id}`).send({ status: 'pending' }).expect(400);
     await rafi.patch(`/parcel/${id}`).send({ status: 'delivered' }).expect(200);
@@ -176,11 +178,11 @@ describe('reviews', () => {
   it('accepts one review per delivered parcel from its owner', async () => {
     const nadia = await t.signIn('nadia@example.com');
     const karim = await t.signIn('karim@example.com');
-    const rafi = await t.signIn('rafi@example.com', 'DeliveryMen');
-    const id = await bookParcel(nadia, { rider: rafi, status: 'on the way' });
+    const rafi = await t.signIn('rafi@example.com', 'rider');
+    const id = await bookParcel(nadia, { rider: rafi, status: 'on_the_way' });
 
     await nadia.post('/reviews').send({ parcelId: id, rating: 5 }).expect(409);
-    await t.db.parcels.updateOne({}, { $set: { status: 'delivered' } });
+    await setStatus(id, 'delivered');
     await karim.post('/reviews').send({ parcelId: id, rating: 5 }).expect(403);
     await nadia.post('/reviews').send({ parcelId: id, rating: 9 }).expect(400);
     await nadia
@@ -189,24 +191,30 @@ describe('reviews', () => {
       .expect(201);
     await nadia.post('/reviews').send({ parcelId: id, rating: 4 }).expect(409);
 
-    const review = await t.db.reviews.findOne({});
-    assert.equal(review.deliveryManId, String(rafi.user._id));
-    assert.equal((await t.db.parcels.findOne({})).reviewed, true);
+    const review = await t.prisma.review.findFirst();
+    assert.equal(review.riderId, rafi.user.id);
+    const [parcel] = (await nadia.get('/my-parcel/nadia@example.com').expect(200)).body;
+    assert.equal(parcel.reviewed, true);
   });
 
   it('never exposes reviewer emails publicly', async () => {
-    await t.db.reviews.insertOne({ rating: 5, reviewerEmail: 'secret@example.com', reviewerName: 'N' });
+    const nadia = await t.signIn('nadia@example.com');
+    const rafi = await t.signIn('rafi@example.com', 'rider');
+    const id = await bookParcel(nadia, { rider: rafi, status: 'delivered' });
+    await nadia.post('/reviews').send({ parcelId: id, rating: 5 }).expect(201);
     const res = await t.request().get('/reviews').expect(200);
+    assert.equal(res.body.length, 1);
+    assert.equal(res.body[0].reviewerName, 'nadia');
     assert.equal(res.body[0].reviewerEmail, undefined);
   });
 
   it("limits a delivery man's review list to themselves and admins", async () => {
-    const rafi = await t.signIn('rafi@example.com', 'DeliveryMen');
-    const sumi = await t.signIn('sumi@example.com', 'DeliveryMen');
+    const rafi = await t.signIn('rafi@example.com', 'rider');
+    const sumi = await t.signIn('sumi@example.com', 'rider');
     const admin = await t.signIn('admin@abc.com', 'admin');
-    await rafi.get(`/reviews/delivery-man/${rafi.user._id}`).expect(200);
-    await admin.get(`/reviews/delivery-man/${rafi.user._id}`).expect(200);
-    await sumi.get(`/reviews/delivery-man/${rafi.user._id}`).expect(403);
+    await rafi.get(`/reviews/delivery-man/${rafi.user.id}`).expect(200);
+    await admin.get(`/reviews/delivery-man/${rafi.user.id}`).expect(200);
+    await sumi.get(`/reviews/delivery-man/${rafi.user.id}`).expect(403);
   });
 });
 
@@ -214,11 +222,11 @@ describe('payments', () => {
   it('charges the stored parcel price and records verified payments', async () => {
     const nadia = await t.signIn('nadia@example.com');
     const karim = await t.signIn('karim@example.com');
-    const rafi = await t.signIn('rafi@example.com', 'DeliveryMen');
-    const id = await bookParcel(nadia, { rider: rafi, status: 'on the way' });
+    const rafi = await t.signIn('rafi@example.com', 'rider');
+    const id = await bookParcel(nadia, { rider: rafi, status: 'on_the_way' });
 
     await nadia.post('/create-payment-intent').send({ parcelId: id }).expect(409);
-    await t.db.parcels.updateOne({}, { $set: { status: 'delivered' } });
+    await setStatus(id, 'delivered');
     await karim.post('/create-payment-intent').send({ parcelId: id }).expect(403);
     await nadia.post('/create-payment-intent').send({ parcelId: id, price: 1 }).expect(200);
 
@@ -231,8 +239,10 @@ describe('payments', () => {
     await nadia.post('/payments').send({ paymentIntentId: intent.id }).expect(201);
     await nadia.post('/payments').send({ paymentIntentId: intent.id }).expect(201);
 
-    assert.equal(await t.db.payments.countDocuments(), 1);
-    assert.equal((await t.db.parcels.findOne({})).paymentStatus, 'paid');
+    assert.equal(await t.prisma.payment.count(), 1);
+    const [parcel] = (await nadia.get('/my-parcel/nadia@example.com').expect(200)).body;
+    assert.equal(parcel.paymentStatus, 'paid');
+    await t.signIn('admin@abc.com', 'admin').then((admin) => admin.delete(`/my-parcel/${id}`).expect(409));
     await nadia.post('/create-payment-intent').send({ parcelId: id }).expect(409);
   });
 });
@@ -242,7 +252,7 @@ describe('statistics', () => {
     const nadia = await t.signIn('nadia@example.com');
     const admin = await t.signIn('admin@abc.com', 'admin');
     await bookParcel(nadia);
-    await t.db.parcels.insertOne({ createdDate: 'not a date', status: 'pending' });
+    await bookParcel(nadia);
 
     const stats = await t.request().get('/statistics').expect(200);
     assert.deepEqual(stats.body, { totalBooked: 2, totalDelivered: 0, totalUsers: 2 });
@@ -250,6 +260,23 @@ describe('statistics', () => {
     await nadia.get('/bookingsByDate').expect(403);
     const byDate = await admin.get('/bookingsByDate').expect(200);
     assert.equal(byDate.body.length, 1);
-    assert.equal(byDate.body[0].count, 1);
+    assert.equal(byDate.body[0].count, 2);
+    assert.match(byDate.body[0]._id, /^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('database rules', () => {
+  // These hold even if a bug in the API skipped its own checks
+  it('enforces one review per parcel, valid ratings and lowercase emails', async () => {
+    const nadia = await t.signIn('nadia@example.com');
+    const rafi = await t.signIn('rafi@example.com', 'rider');
+    const parcelId = await bookParcel(nadia, { rider: rafi, status: 'delivered' });
+    const review = { parcelId, riderId: rafi.user.id, customerId: nadia.user.id, rating: 5 };
+
+    await t.prisma.review.create({ data: review });
+    await assert.rejects(t.prisma.review.create({ data: review }), { code: 'P2002' });
+    await t.prisma.review.deleteMany();
+    await assert.rejects(t.prisma.review.create({ data: { ...review, rating: 9 } }), /reviews_rating_range/);
+    await assert.rejects(t.prisma.user.create({ data: { email: 'Mixed@Example.com' } }), /users_email_lowercase/);
   });
 });

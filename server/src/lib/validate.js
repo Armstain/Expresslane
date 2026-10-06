@@ -1,11 +1,10 @@
-const { ObjectId } = require('mongodb');
 const { HttpError } = require('./http');
 
-const toObjectId = (id, label = 'id') => {
-  if (!ObjectId.isValid(id) || String(new ObjectId(id)) !== String(id)) {
-    throw new HttpError(400, `Invalid ${label}`);
-  }
-  return new ObjectId(id);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const toUuid = (id, label = 'id') => {
+  if (typeof id !== 'string' || !UUID_RE.test(id)) throw new HttpError(400, `Invalid ${label}`);
+  return id.toLowerCase();
 };
 
 // Trimmed string within a length limit; undefined when absent or empty
@@ -30,10 +29,11 @@ const optionalNumber = (value, field, { min = -Infinity, max = Infinity } = {}) 
   return n;
 };
 
+// Returns a Date; date-only strings like "2026-10-10" become midnight UTC
 const requiredDate = (value, field) => {
   const date = new Date(value);
   if (!value || Number.isNaN(date.getTime())) throw new HttpError(400, `${field} must be a valid date`);
-  return value;
+  return date;
 };
 
-module.exports = { toObjectId, optionalString, requiredString, optionalNumber, requiredDate };
+module.exports = { toUuid, optionalString, requiredString, optionalNumber, requiredDate };

@@ -1,0 +1,118 @@
+// ExpressLane database schema.
+// After changing this file: `npm run db:migrate -- --name <change>` (creates a migration)
+// and `npm run db:generate` (refreshes the Prisma Client).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  customer
+  rider
+  admin
+
+  @@map("user_role")
+}
+
+enum ParcelType {
+  regular
+  express
+  international
+
+  @@map("parcel_type")
+}
+
+enum ParcelStatus {
+  pending
+  on_the_way
+  delivered
+  cancelled
+
+  @@map("parcel_status")
+}
+
+model User {
+  id          String   @id @default(uuid()) @db.Uuid
+  /// Always stored lowercase (enforced by a CHECK constraint)
+  email       String   @unique
+  displayName String?  @map("display_name")
+  photoUrl    String?  @map("photo_url")
+  phone       String?
+  role        Role     @default(customer)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  parcels         Parcel[] @relation("CustomerParcels")
+  deliveries      Parcel[] @relation("RiderParcels")
+  reviewsWritten  Review[] @relation("ReviewAuthor")
+  reviewsReceived Review[] @relation("ReviewRider")
+
+  @@index([role])
+  @@map("users")
+}
+
+model Parcel {
+  id                String       @id @default(uuid()) @db.Uuid
+  customerId        String       @map("customer_id") @db.Uuid
+  customer          User         @relation("CustomerParcels", fields: [customerId], references: [id], onDelete: Cascade)
+  senderName        String       @map("sender_name")
+  senderPhone       String       @map("sender_phone")
+  type              ParcelType
+  weightKg          Decimal      @map("weight_kg") @db.Decimal(6, 2)
+  recipientName     String       @map("recipient_name")
+  recipientPhone    String       @map("recipient_phone")
+  recipientAddress  String       @map("recipient_address")
+  latitude          Decimal?     @db.Decimal(9, 6)
+  longitude         Decimal?     @db.Decimal(9, 6)
+  pickupDate        DateTime     @map("pickup_date") @db.Date
+  estimatedDelivery DateTime?    @map("estimated_delivery") @db.Date
+  /// Money is stored in cents to avoid floating-point rounding
+  priceCents        Int          @map("price_cents")
+  status            ParcelStatus @default(pending)
+  riderId           String?      @map("rider_id") @db.Uuid
+  rider             User?        @relation("RiderParcels", fields: [riderId], references: [id], onDelete: SetNull)
+  deliveredAt       DateTime?    @map("delivered_at") @db.Timestamptz(3)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  review  Review?
+  payment Payment?
+
+  @@index([customerId])
+  @@index([riderId, status])
+  @@index([createdAt])
+  @@map("parcels")
+}
+
+model Review {
+  id         String   @id @default(uuid()) @db.Uuid
+  /// One review per parcel
+  parcelId   String   @unique @map("parcel_id") @db.Uuid
+  parcel     Parcel   @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  riderId    String   @map("rider_id") @db.Uuid
+  rider      User     @relation("ReviewRider", fields: [riderId], references: [id], onDelete: Cascade)
+  customerId String   @map("customer_id") @db.Uuid
+  customer   User     @relation("ReviewAuthor", fields: [customerId], references: [id], onDelete: Cascade)
+  /// 1–5, enforced by a CHECK constraint
+  rating     Int      @db.SmallInt
+  feedback   String   @default("")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([riderId])
+  @@map("reviews")
+}
+
+model Payment {
+  id                    String   @id @default(uuid()) @db.Uuid
+  /// One payment per parcel; a paid parcel can't be deleted (Restrict)
+  parcelId              String   @unique @map("parcel_id") @db.Uuid
+  parcel                Parcel   @relation(fields: [parcelId], references: [id], onDelete: Restrict)
+  stripePaymentIntentId String   @unique @map("stripe_payment_intent_id")
+  amountCents           Int      @map("amount_cents")
+  currency              String   @default("usd")
+  paidAt                DateTime @default(now()) @map("paid_at") @db.Timestamptz(3)
+
+  @@map("payments")
+}
