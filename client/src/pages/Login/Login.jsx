@@ -1,165 +1,148 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { FcGoogle } from "react-icons/fc";
-import useAuth from "../../hooks/useAuth";
-import toast from "react-hot-toast";
-import { TbFidgetSpinner } from "react-icons/tb";
 import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
+import useAuth from "../../hooks/useAuth";
+import AuthLayout, { GoogleIcon, OrDivider } from "@/components/Shared/AuthLayout.jsx";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+const DEMO_ADMIN = { email: "admin@abc.com", password: "123456" };
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location?.state || "/";
-  const { signInWithGoogle, signIn, loading, setLoading, resetPassword } =
-    useAuth();
+  const from = location?.state || "/dashboard";
+  const { signInWithGoogle, signIn, loading, setLoading, resetPassword } = useAuth();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const form = e.target;
-    const email = form.email.value;
-    const password = form.password.value;
-
+    setSubmitting(true);
     try {
-      setLoading(true);
-      // 1. sign in user
       await signIn(email, password);
-      navigate(from);
-      toast.success("Signup Successful");
+      navigate(from, { replace: true });
+      toast.success("Welcome back!");
     } catch (err) {
-      console.log(err);
-      toast.error(err.message);
+      toast.error(err.code === "auth/invalid-credential" ? "Incorrect email or password." : err.message);
       setLoading(false);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleResetPassword = async () => {
-    if (!email) return toast.error("Please write your email first!");
+    if (!email) return toast.error("Enter your email first, then click “Forgot password”.");
     try {
       await resetPassword(email);
-      toast.success("Request Success! Check your email for further process...");
-      setLoading(false);
+      toast.success("Password reset email sent. Check your inbox.");
     } catch (err) {
-      console.log(err);
       toast.error(err.message);
-      setLoading(false);
     }
-    console.log(email);
   };
 
-  // handle google signin
   const handleGoogleSignIn = async () => {
     try {
       await signInWithGoogle();
-
-      navigate(from);
-      toast.success("Signup Successful");
+      navigate(from, { replace: true });
+      toast.success("Welcome back!");
     } catch (err) {
-      console.log(err);
       toast.error(err.message);
+      setLoading(false);
     }
   };
 
-  return (
-    <div className="flex justify-center items-center min-h-screen">
-      <div className="flex flex-col max-w-md p-6 rounded-md sm:p-10 bg-gray-100 text-gray-900">
-        <div className="mb-8 text-center">
-          <h1 className="my-3 text-4xl font-bold">Log In</h1>
-          <p className="text-sm text-gray-400">
-            Sign in to access your account
-          </p>
-        </div>
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-6 ng-untouched ng-pristine ng-valid"
-        >
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block mb-2 text-sm">
-                Email address
-              </label>
-              <input
-                type="email"
-                name="email"
-                onBlur={(e) => setEmail(e.target.value)}
-                id="email"
-                required
-                placeholder="Enter Your Email Here"
-                className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-rose-500 bg-gray-200 text-gray-900"
-                data-temp-mail-org="0"
-              />
-              <p className="text-xs ">Admin Email: admin@abc.com</p>
-            </div>
-            <div>
-              <div className="flex justify-between">
-                <label htmlFor="password" className="text-sm mb-2">
-                  Password
-                </label>
-              </div>
-              <input
-                type="password"
-                name="password"
-                autoComplete="current-password"
-                id="password"
-                required
-                placeholder="*******"
-                className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-rose-500 bg-gray-200 text-gray-900"
-              />
-              <p className="text-xs ">Admin Password: 123456</p>
-            </div>
-          </div>
+  const busy = submitting || loading;
 
-          <div>
+  return (
+    <AuthLayout title="Welcome back" description="Log in to manage your parcels and deliveries." pageTitle="Log in">
+      <Button type="button" variant="outline" size="lg" className="w-full" disabled={busy} onClick={handleGoogleSignIn}>
+        <GoogleIcon /> Continue with Google
+      </Button>
+
+      <OrDivider label="or with email" />
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
             <button
-              disabled={loading}
-              type="submit"
-              className="bg-rose-500 w-full rounded-md py-3 text-white"
+              type="button"
+              onClick={handleResetPassword}
+              className="text-xs font-medium text-primary hover:underline"
             >
-              {loading ? (
-                <TbFidgetSpinner className="animate-spin m-auto" />
-              ) : (
-                "Sign In"
-              )}
+              Forgot password?
             </button>
           </div>
-        </form>
-        <div className="space-y-1">
-          <button
-            onClick={handleResetPassword}
-            className="text-xs hover:underline hover:text-rose-500 text-gray-400"
-          >
-            Forgot password?
-          </button>
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              placeholder="Your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="pr-10"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((s) => !s)}
+              className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center pt-4 space-x-1">
-          <div className="flex-1 h-px sm:w-16 dark:bg-gray-700"></div>
-          <p className="px-3 text-sm dark:text-gray-400">
-            Login with social accounts
-          </p>
-          <div className="flex-1 h-px sm:w-16 dark:bg-gray-700"></div>
-        </div>
+        <Button type="submit" size="lg" className="w-full" disabled={busy}>
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Log in"}
+        </Button>
+      </form>
 
-        <button
-          disabled={loading}
-          onClick={handleGoogleSignIn}
-          className="disabled:cursor-not-allowed flex justify-center items-center space-x-2 border m-3 p-2 border-gray-300 border-rounded cursor-pointer"
+      <div className="mt-6 flex items-start gap-3 rounded-lg border border-dashed bg-secondary/50 p-3 text-sm">
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <div className="flex-1">
+          <p className="font-medium">Exploring the demo?</p>
+          <p className="text-xs text-muted-foreground">Sign in as an admin to see every dashboard.</p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 text-primary"
+          onClick={() => {
+            setEmail(DEMO_ADMIN.email);
+            setPassword(DEMO_ADMIN.password);
+          }}
         >
-          <FcGoogle size={32} />
-
-          <p>Continue with Google</p>
-        </button>
-
-        <p className="px-6 text-sm text-center text-gray-400">
-          Don&apos;t have an account yet?{" "}
-          <Link
-            to="/signup"
-            className="hover:underline hover:text-rose-500 text-gray-600"
-          >
-            Sign up
-          </Link>
-          .
-        </p>
+          Fill in
+        </Button>
       </div>
-    </div>
+
+      <p className="mt-8 text-center text-sm text-muted-foreground">
+        Don&apos;t have an account?{" "}
+        <Link to="/signup" className="font-semibold text-primary hover:underline">
+          Sign up
+        </Link>
+      </p>
+    </AuthLayout>
   );
 };
 

@@ -1,58 +1,52 @@
-
-
-import React from 'react';
 import PropTypes from 'prop-types';
+import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import { MapPinOff } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import EmptyState from '@/components/Shared/EmptyState.jsx';
 
-const LocationModal = ({ isOpen, onClose, children }) => {
-    if (!isOpen) return null;
+const LocationModal = ({ isOpen, onClose, parcel }) => {
+    const lat = parseFloat(parcel?.latitude);
+    const lng = parseFloat(parcel?.longitude);
+    const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
 
     return (
-        <div className="modal-overlay" style={overlayStyles}>
-            <div className="modal-content" style={contentStyles}>
-                <button className="modal-close" style={closeButtonStyles} onClick={onClose}>
-                    &times;
-                </button>
-                {children}
-            </div>
-        </div>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Delivery location</DialogTitle>
+                    <DialogDescription>{parcel?.recipientAddress || 'No address provided'}</DialogDescription>
+                </DialogHeader>
+                {hasLocation ? (
+                    <MapContainer center={[lat, lng]} zoom={14} scrollWheelZoom={false} className="h-[360px] w-full">
+                        <TileLayer
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                        <CircleMarker
+                            center={[lat, lng]}
+                            radius={10}
+                            pathOptions={{ color: '#ffffff', weight: 3, fillColor: '#5144e4', fillOpacity: 1 }}
+                        >
+                            <Popup>{parcel?.recipientName || 'Recipient'}</Popup>
+                        </CircleMarker>
+                    </MapContainer>
+                ) : (
+                    <EmptyState
+                        icon={MapPinOff}
+                        title="No map pin for this parcel"
+                        description="The sender didn't add coordinates. Use the address above and the recipient's phone number."
+                    />
+                )}
+            </DialogContent>
+        </Dialog>
     );
 };
 
 LocationModal.propTypes = {
-    isOpen: PropTypes.bool.isRequired,
+    isOpen: PropTypes.bool,
     onClose: PropTypes.func.isRequired,
-    children: PropTypes.node.isRequired,
-};
-
-const overlayStyles = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-};
-
-const contentStyles = {
-    backgroundColor: '#fff',
-    borderRadius: '5px',
-    padding: '20px',
-    position: 'relative',
-    width: '90%',
-    maxWidth: '600px',
-};
-
-const closeButtonStyles = {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
-    background: 'none',
-    border: 'none',
-    fontSize: '20px',
-    cursor: 'pointer',
+    parcel: PropTypes.object,
 };
 
 export default LocationModal;

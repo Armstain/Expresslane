@@ -1,234 +1,208 @@
 import { useState } from "react";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableHead,
-} from "@/components/ui/table";
-import { format } from "date-fns";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import useAxiosSecure from "@/hooks/useAxiosSecure.jsx";
 import toast from "react-hot-toast";
-import DeleteModal from "@/components/Modal/DeleteModal.jsx";
+import { add, format, isValid } from "date-fns";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Package, Trash2, UserPlus } from "lucide-react";
+import useAxiosSecure from "@/hooks/useAxiosSecure.jsx";
+import { formatDate } from "@/api/utils/dateUtils.js";
+import { formatPrice } from "@/lib/parcel.js";
+import { cn } from "@/lib/utils";
 import AllParcelModal from "@/components/Modal/AllParcelModal.jsx";
-import { Button } from "@/components/ui/button";
-import { calculateApproximateDeliveryDate } from "@/api/utils/dateUtils.js";
+import ConfirmDialog from "@/components/Shared/ConfirmDialog.jsx";
+import EmptyState from "@/components/Shared/EmptyState.jsx";
 import LoadingSpinner from "@/components/Shared/LoadingSpinner.jsx";
+import PageHeader from "@/components/Shared/PageHeader.jsx";
+import StatusBadge from "@/components/Shared/StatusBadge.jsx";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+const FILTERS = [
+  { value: "all", label: "All" },
+  { value: "pending", label: "Pending" },
+  { value: "on the way", label: "On the way" },
+  { value: "delivered", label: "Delivered" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const TRANSIT_DAYS = { Express: 1, Regular: 3, International: 7 };
+
+// Default ETA for the assign dialog, in the yyyy-MM-dd format a date input expects
+const defaultEta = (parcel) => {
+  const base = new Date(parcel.deliveryDate);
+  const start = isValid(base) ? base : new Date();
+  return format(add(start, { days: TRANSIT_DAYS[parcel.parcelType] ?? 3 }), "yyyy-MM-dd");
+};
 
 const AllParcels = () => {
   const axiosSecure = useAxiosSecure();
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedParcelId, setSelectedParcelId] = useState(null);
-  const [parcelToUpdate, setParcelToUpdate] = useState(null);
-  const [selectedDeliveryMan, setSelectedDeliveryMan] = useState(null);
-  const [approximateDeliveryDate, setApproximateDeliveryDate] = useState(null);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [assigning, setAssigning] = useState(null);
+  const [deliveryManId, setDeliveryManId] = useState("");
+  const [approximateDeliveryDate, setApproximateDeliveryDate] = useState("");
+  const [deleteId, setDeleteId] = useState(null);
 
-  const { mutateAsync: updateParcel } = useMutation({
+  const { data: parcels = [], isLoading, refetch } = useQuery({
+    queryKey: ["parcels"],
+    queryFn: async () => (await axiosSecure.get("/parcels")).data,
+  });
+
+  const { data: deliveryMen = [] } = useQuery({
+    queryKey: ["users"],
+    queryFn: async () => (await axiosSecure.get("/users")).data,
+    select: (users) => users.filter((u) => u.role === "DeliveryMen"),
+  });
+
+  const { mutate: assignParcel, isPending: saving } = useMutation({
     mutationFn: async (id) => {
       const { data } = await axiosSecure.patch(`/parcel/${id}`, {
-        deliveryManId: selectedDeliveryMan,
+        deliveryManId,
         approximateDeliveryDate,
         status: "on the way",
       });
       return data;
     },
     onSuccess: () => {
-      toast.success("Parcel assigned successfully");
+      toast.success("Rider assigned");
       refetch();
-      setIsOpen(false);
+      setAssigning(null);
     },
-    onError: (error) => {
-      toast.error(error.message);
-    },
+    onError: (error) => toast.error(error.message),
   });
 
-  const { mutateAsync: deleteParcel } = useMutation({
-    mutationFn: async (id) => {
-      const { data } = await axiosSecure.delete(`/my-parcel/${id}`);
-      return data;
-    },
+  const { mutate: deleteParcel } = useMutation({
+    mutationFn: async (id) => (await axiosSecure.delete(`/my-parcel/${id}`)).data,
     onSuccess: () => {
       refetch();
-      toast.success("Parcel deleted successfully");
-      setIsDeleteOpen(false);
+      toast.success("Parcel deleted");
     },
-    onError: (error) => {
-      toast.error(error.message);
-    },
+    onError: (error) => toast.error(error.message),
   });
 
-  // eslint-disable-next-line no-unused-vars
-  const { data: allDeliveryMen = [], isLoading: isDeliveryMenLoading } =
-    useQuery({
-      queryKey: ["DeliveryMen"],
-      queryFn: async () => {
-        const res = await axiosSecure.get("/users");
+  if (isLoading) return <LoadingSpinner />;
 
-        return res.data.filter((user) => user.role === "DeliveryMen");
-      },
-    });
-
-  const {
-    data: parcels = [],
-    isLoading,
-    refetch,
-  } = useQuery({
-    queryKey: ["parcels"],
-    queryFn: async () => {
-      const res = await axiosSecure.get("/parcels");
-      return res.data;
-    },
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-[60vh]">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  const handleManageClick = (parcel) => {
-    setParcelToUpdate(parcel);
-    setApproximateDeliveryDate(
-      calculateApproximateDeliveryDate(parcel.parcelType, parcel.deliveryDate)
-    );
-    setIsOpen(true);
+  const openAssign = (parcel) => {
+    setAssigning(parcel);
+    setDeliveryManId(parcel.deliveryManId || "");
+    setApproximateDeliveryDate(defaultEta(parcel));
   };
 
-  const handleAssignParcel = async (parcel) => {
-    await updateParcel(parcel._id);
-  };
-
-  const handleDelete = async (id) => {
-    try {
-      await deleteParcel(id);
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const closeModal = () => {
-    setIsDeleteOpen(false);
-    setIsOpen(false);
-  };
+  const riderName = Object.fromEntries(deliveryMen.map((m) => [m._id, m.displayName || m.email]));
+  const counts = parcels.reduce((acc, p) => ({ ...acc, [p.status]: (acc[p.status] || 0) + 1 }), {});
+  const visible = filter === "all" ? parcels : parcels.filter((p) => p.status === filter);
 
   return (
-    <div className="container mx-auto px-4 sm:px-8 py-8">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
-        {/* Gradient Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
-          <h2 className="text-2xl font-bold text-white">Parcel Management</h2>
-          <div className="flex items-center gap-4 mt-2">
-            <p className="text-blue-100">Total Parcels: {parcels.length}</p>
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-100"></span>
-            <p className="text-blue-100">
-              Pending: {parcels.filter((p) => p.status === "pending").length}
-            </p>
-          </div>
+    <>
+      <PageHeader
+        title="Parcels"
+        description={`${parcels.length} total · ${counts.pending || 0} waiting for a rider`}
+      />
+
+      <Card className="overflow-hidden">
+        <div className="flex gap-1 overflow-x-auto border-b p-2" role="tablist" aria-label="Filter by status">
+          {FILTERS.map((f) => (
+            <button
+              key={f.value}
+              role="tab"
+              aria-selected={filter === f.value}
+              onClick={() => setFilter(f.value)}
+              className={cn(
+                "flex shrink-0 items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                filter === f.value ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {f.label}
+              <span className="rounded-full bg-background px-1.5 text-xs tabular-nums">
+                {f.value === "all" ? parcels.length : counts[f.value] || 0}
+              </span>
+            </button>
+          ))}
         </div>
 
-        <div className="overflow-x-auto">
+        {visible.length === 0 ? (
+          <EmptyState icon={Package} title="No parcels here" description="Nothing matches this filter yet." />
+        ) : (
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50 dark:bg-gray-700">
-                <TableHead className="font-semibold">Name</TableHead>
-                <TableHead className="font-semibold">Phone Number</TableHead>
-                <TableHead className="font-semibold">Parcel Type</TableHead>
-                <TableHead className="font-semibold">Booking Date</TableHead>
-                <TableHead className="font-semibold">Price</TableHead>
-                <TableHead className="font-semibold">Delivery Man</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="font-semibold">Actions</TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Customer</TableHead>
+                <TableHead>Parcel</TableHead>
+                <TableHead>Booked</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Rider</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {parcels.map((parcel) => (
-                <TableRow
-                  key={parcel._id}
-                  className="hover:bg-blue-50 dark:hover:bg-gray-700 transition-all duration-200"
-                >
-                  <TableCell className="font-medium text-gray-800 dark:text-gray-200">
-                    {parcel.name}
-                  </TableCell>
-                  <TableCell className="text-gray-600 dark:text-gray-300">
-                    {parcel.phoneNumber}
+              {visible.map((parcel) => (
+                <TableRow key={parcel._id}>
+                  <TableCell>
+                    <p className="font-medium">{parcel.name || "—"}</p>
+                    <p className="text-xs text-muted-foreground">{parcel.phoneNumber}</p>
                   </TableCell>
                   <TableCell>
-                    <span className="px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 font-medium">
-                      {parcel.parcelType}
-                    </span>
+                    <p className="font-medium">{parcel.parcelType}</p>
+                    <p className="text-xs text-muted-foreground">{parcel.parcelWeight ? `${parcel.parcelWeight} kg` : ""}</p>
                   </TableCell>
-                  <TableCell className="text-gray-600 dark:text-gray-300">
-                    {format(new Date(parcel.createdDate), "MMM dd, yyyy")}
+                  <TableCell className="whitespace-nowrap text-muted-foreground">{formatDate(parcel.createdDate)}</TableCell>
+                  <TableCell className="font-medium tabular-nums">{formatPrice(parcel.price)}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {parcel.deliveryManId ? riderName[parcel.deliveryManId] || "Assigned" : "Unassigned"}
                   </TableCell>
+                  <TableCell><StatusBadge status={parcel.status} /></TableCell>
                   <TableCell>
-                    <span className="font-medium text-gray-800 dark:text-gray-200">
-                      ${parcel.price}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-gray-600 dark:text-gray-300">
-                    {parcel.deliveryManId || "Not Assigned"}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-3 py-1.5 rounded-full font-medium ${
-                        parcel.status === "delivered"
-                          ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
-                          : parcel.status === "on the way"
-                          ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100"
-                          : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300"
-                      }`}
-                    >
-                      {parcel.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="space-x-2">
-                    <Button
-                      disabled={parcel.status === "delivered"}
-                      onClick={() => handleManageClick(parcel)}
-                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white transition-all duration-300 transform hover:scale-105"
-                    >
-                      Manage
-                    </Button>
-                    {parcel.status === "pending" && (
+                    <div className="flex justify-end gap-2">
                       <Button
-                        onClick={() => {
-                          setSelectedParcelId(parcel._id);
-                          setIsDeleteOpen(true);
-                        }}
-                        variant="destructive"
-                        className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white transition-all duration-300 transform hover:scale-105"
+                        size="sm"
+                        variant={parcel.deliveryManId ? "outline" : "default"}
+                        disabled={parcel.status === "delivered" || parcel.status === "cancelled"}
+                        onClick={() => openAssign(parcel)}
                       >
-                        Delete
+                        <UserPlus className="h-4 w-4" /> {parcel.deliveryManId ? "Reassign" : "Assign"}
                       </Button>
-                    )}
+                      {parcel.status === "pending" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => setDeleteId(parcel._id)}
+                          aria-label="Delete parcel"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </div>
-      </div>
+        )}
+      </Card>
 
-      {/* Parcel Management Modal */}
-      {parcelToUpdate && (
-        <AllParcelModal
-          isOpen={isOpen}
-          onClose={closeModal}
-          parcelToUpdate={parcelToUpdate}
-          allDeliveryMen={allDeliveryMen}
-          setSelectedDeliveryMan={setSelectedDeliveryMan}
-          setApproximateDeliveryDate={setApproximateDeliveryDate}
-          handleAssignParcel={handleAssignParcel}
-          selectedDeliveryMan={selectedDeliveryMan}
-          approximateDeliveryDate={approximateDeliveryDate}
-        />
-      )}
-    </div>
+      <AllParcelModal
+        isOpen={!!assigning}
+        onClose={() => setAssigning(null)}
+        parcel={assigning}
+        deliveryMen={deliveryMen}
+        deliveryManId={deliveryManId}
+        setDeliveryManId={setDeliveryManId}
+        approximateDeliveryDate={approximateDeliveryDate}
+        setApproximateDeliveryDate={setApproximateDeliveryDate}
+        onAssign={() => assignParcel(assigning._id)}
+        saving={saving}
+      />
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title="Delete this parcel?"
+        description="The booking will be permanently removed."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => deleteParcel(deleteId)}
+      />
+    </>
   );
 };
 

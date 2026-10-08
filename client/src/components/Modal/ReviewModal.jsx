@@ -1,112 +1,97 @@
-
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
+import toast from 'react-hot-toast';
+import { Rating } from "@smastrom/react-rating";
+import "@smastrom/react-rating/style.css";
+import { Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import useAxiosSecure from "@/hooks/useAxiosSecure";
+import { Button } from "@/components/ui/button";
 import {
     Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogContent,
-    DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Rating } from "@smastrom/react-rating";
-import "@smastrom/react-rating/style.css"; // Import the CSS for star rating
-import useAxiosSecure from "@/hooks/useAxiosSecure";
-import useAuth from '@/hooks/useAuth.jsx';
-import toast from 'react-hot-toast'
+
+const RATING_LABELS = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent'];
 
 const ReviewModal = ({ isOpen, onClose, parcel }) => {
     const axiosSecure = useAxiosSecure();
-    const { user } = useAuth();
+    const queryClient = useQueryClient();
     const [rating, setRating] = useState(0);
-    const [reviewSubmitted, setReviewSubmitted] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        if (!isOpen) {
-            setRating(0);
-            setReviewSubmitted(false);
-        }
+        if (!isOpen) setRating(0);
     }, [isOpen]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (rating === 0) return toast.error('Please choose a rating.');
 
-        if (rating === 0) {
-            toast.error('Please provide a rating.');
-            return;
-        }
-
+        setSubmitting(true);
         try {
-            const response = await axiosSecure.post('/reviews', {
+            // Reviewer and rider details are filled in by the API from the parcel
+            await axiosSecure.post('/reviews', {
+                parcelId: parcel._id,
                 rating,
                 feedback: e.target.feedback.value,
-                deliveryManId: parcel.deliveryManId,
-                parcelId: parcel._id,
-                reviewerEmail: user?.email,
-                reviewerName: user?.displayName,
-                reviewDate: new Date()
             });
-
-            if (response.status === 200) {
-                toast.success('Review submitted successfully.');
-                setReviewSubmitted(true);
-                onClose();
-            } else {
-                toast.error('Failed to submit review.');
-            }
-        } catch (error) {
-            toast.error('An error occurred while submitting the review.');
+            queryClient.invalidateQueries({ queryKey: ['my-parcel'] });
+            toast.success('Thanks for your review!');
+            onClose();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not submit your review. Please try again.');
+        } finally {
+            setSubmitting(false);
         }
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[425px]">
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Give Review</DialogTitle>
+                    <DialogTitle>Rate your delivery</DialogTitle>
+                    <DialogDescription>
+                        How was the delivery of your {parcel?.parcelType?.toLowerCase()} parcel to {parcel?.recipientName || 'the recipient'}?
+                    </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* User's Name */}
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <label htmlFor="name" className="text-right">
-                            Your Name:
-                        </label>
-                        <Input id="name" value={user?.displayName || ''} readOnly className="col-span-3" />
-                    </div>
-
-                    {/* User's Image */}
-                    {user?.photoURL && (
-                        <div className="flex justify-center">
-                            <img src={user.photoURL} alt="User Avatar" className="w-20 h-20 rounded-full" />
-                        </div>
-                    )}
-
-                    {/* Rating */}
-                    <div className="flex items-center gap-2">
-                        <label htmlFor="rating">Rating:</label>
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    <div className="flex flex-col items-center gap-2 rounded-lg bg-secondary/60 py-5">
                         <Rating
-                            style={{ maxWidth: 180 }}
+                            style={{ maxWidth: 200 }}
                             value={rating}
                             onChange={setRating}
+                            aria-label="Rating"
                         />
+                        <p className="h-5 text-sm font-medium text-muted-foreground">{RATING_LABELS[rating]}</p>
                     </div>
-
-                    {/* Feedback */}
-                    <div>
-                        <label htmlFor="feedback">Feedback</label>
-                        <Textarea id="feedback" placeholder="Share your experience..." />
+                    <div className="space-y-2">
+                        <Label htmlFor="feedback">Feedback <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                        <Textarea id="feedback" name="feedback" rows={4} placeholder="Share your experience…" />
                     </div>
-
-                    {/* Hidden Input for Delivery Man's Id */}
-                    <input type="hidden" value={parcel ? parcel.deliveryManId : ""} name="deliveryManId" />
-
-                    <Button type="submit">{reviewSubmitted ? 'Reviewed' : 'Submit Review'}</Button>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+                        <Button type="submit" disabled={submitting}>
+                            {submitting && <Loader2 className="h-4 w-4 animate-spin" />} Submit review
+                        </Button>
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
     );
+};
+
+ReviewModal.propTypes = {
+    isOpen: PropTypes.bool,
+    onClose: PropTypes.func.isRequired,
+    parcel: PropTypes.object,
 };
 
 export default ReviewModal;

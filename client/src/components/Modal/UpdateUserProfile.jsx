@@ -1,80 +1,107 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
-import useAuth from '@/hooks/useAuth.jsx';
+import { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import toast from 'react-hot-toast';
+import { Loader2 } from 'lucide-react';
+import useAuth from '@/hooks/useAuth.jsx';
+import { imageUpload } from '@/api/utils';
+import UserAvatar from '@/components/Shared/UserAvatar.jsx';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const UpdateProfileModal = ({ isOpen, onClose }) => {
-  const { user, updateUserProfile } = useAuth();
-  const [name, setName] = useState(user?.displayName || '');
-  const [photoURL, setPhotoURL] = useState(user?.photoURL || '');
+  const { user, updateUserProfile, saveUser } = useAuth();
+  const [name, setName] = useState('');
+  const [photoURL, setPhotoURL] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // Reset the form to the current profile whenever the dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setName(user?.displayName || '');
+      setPhotoURL(user?.photoURL || '');
+    }
+  }, [isOpen, user]);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSaving(true);
     try {
-      await updateUserProfile(name, photoURL);
-      onClose();
-      toast.success('Profile updated successfully');
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
+      setPhotoURL(await imageUpload(file));
+    } catch {
+      toast.error('Image upload failed');
+    } finally {
+      setSaving(false);
     }
   };
 
-  if (!isOpen) return null;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await updateUserProfile(name, photoURL);
+      await saveUser({ displayName: name, photoURL, email: user.email });
+      toast.success('Profile updated');
+      onClose();
+    } catch {
+      toast.error('Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-      <div className="bg-white rounded-lg p-6 w-96">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Update Profile</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={24} />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-              Name
-            </label>
-            <input
-              type="text"
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-            />
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit profile</DialogTitle>
+          <DialogDescription>Update how your name and photo appear across ExpressLane.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className='space-y-4'>
+          <div className='flex items-center gap-4'>
+            <UserAvatar src={photoURL} name={name} email={user?.email} className='h-16 w-16 text-lg' />
+            <div className='space-y-1'>
+              <Label htmlFor='photo-file' className='cursor-pointer text-primary hover:underline'>
+                Upload new photo
+              </Label>
+              <input id='photo-file' type='file' accept='image/*' className='sr-only' onChange={handleFile} />
+              <p className='text-xs text-muted-foreground'>Or paste an image URL below.</p>
+            </div>
           </div>
-          <div className="mb-4">
-            <label htmlFor="photoURL" className="block text-sm font-medium text-gray-700">
-              Photo URL
-            </label>
-            <input
-              type="text"
-              id="photoURL"
-              value={photoURL}
-              onChange={(e) => setPhotoURL(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-            />
+          <div className='space-y-2'>
+            <Label htmlFor='profile-name'>Name</Label>
+            <Input id='profile-name' value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="mr-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500"
-            >
+          <div className='space-y-2'>
+            <Label htmlFor='profile-photo'>Photo URL</Label>
+            <Input id='profile-photo' type='url' value={photoURL} onChange={(e) => setPhotoURL(e.target.value)} placeholder='https://…' />
+          </div>
+          <DialogFooter>
+            <Button type='button' variant='outline' onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500"
-            >
-              Update
-            </button>
-          </div>
+            </Button>
+            <Button type='submit' disabled={saving}>
+              {saving && <Loader2 className='h-4 w-4 animate-spin' />} Save changes
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
+};
+
+UpdateProfileModal.propTypes = {
+  isOpen: PropTypes.bool,
+  onClose: PropTypes.func.isRequired,
 };
 
 export default UpdateProfileModal;
